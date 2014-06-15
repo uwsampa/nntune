@@ -11,9 +11,12 @@ endif
 LIBFANN=$(FANNDIR)/src/libfann.$(LIBEXT)
 
 .PHONY: all
-all: $(LIBFANN) train
+all: $(LIBFANN) train recall
 
 train: train.o
+	$(CC) $(LDFLAGS) $^ -o $@
+
+recall: recall.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 $(LIBFANN): $(FANNDIR)/src/*.c
