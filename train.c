@@ -44,19 +44,20 @@ int main(int argc, char **argv)
     struct fann *ann;
 	ann = fann_create_standard_array(num_layers, layer_sizes);
 
+    // Misc parameters.
+    fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
 	fann_set_activation_steepness_hidden(ann, 0.5);
 	fann_set_activation_steepness_output(ann, 0.5);
 	fann_set_activation_function_hidden(ann, FANN_SIGMOID);
 	fann_set_activation_function_output(ann, FANN_SIGMOID);
-	//fann_set_learning_rate(ann, 0.010000);
-	//fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
-	//fann_set_bit_fail_limit(ann, 0.01f);
-	fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
+    //fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
+    //fann_set_bit_fail_limit(ann, 0.01f);
 
     struct fann_train_data *data;
-    data = fann_read_train_from_file(argv[1]);
+    data = fann_read_train_from_file(datafn);
 	fann_init_weights(ann, data);
 	
+    fann_set_learning_rate(ann, learning_rate);
 	fann_train_on_data(
         ann,
         data,
