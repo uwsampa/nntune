@@ -4,6 +4,8 @@ import tempfile
 import os
 import random
 import logging
+import collections
+import sys
 
 
 TRAIN_CMD = './train'
@@ -137,7 +139,7 @@ def exhaustive_topos(max_layers=2, max_neurons=4):
                 break
 
 
-def nntune(datafn):
+def nntune_sequential(datafn):
     min_error = None
     min_topo = None
 
@@ -161,6 +163,48 @@ def nntune(datafn):
     logging.info('error: {}'.format(min_error))
 
 
+def nntune_cw(datafn):
+    import cw.client
+    import threading
+
+    # Map job IDs to topologies.
+    jobs = {}
+    jobs_lock = threading.Lock()
+
+    # Map topologies to errors.
+    topo_errors = collections.defaultdict(list)
+
+    def completion(jobid, output):
+        with jobs_lock:
+            topo = jobs.pop(jobid)
+        logging.info(u'got result for {}'.format('-'.join(map(str, topo))))
+        topo_errors[topo].append(output)
+
+    # Run jobs.
+    client = cw.client.ClientThread(completion)
+    client.start()
+    for topo in exhaustive_topos():
+        for i in range(REPS):
+            jobid = cw.randid()
+            with jobs_lock:
+                jobs[jobid] = topo
+            client.submit(jobid, evaluate, datafn, topo)
+    logging.info('all jobs submitted')
+    client.wait()
+    logging.info('all jobs finished')
+
+    # Find best.
+    min_error = None
+    min_topo = None
+    for topo, errors in topo_errors.items():
+        error = sum(errors) / len(errors)
+        if min_error is None or error < min_error:
+            min_error = error
+            min_topo = topo
+    print('best:', '-'.join(map(str, min_topo)))
+    print('error:', min_error)
+
+
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
-    nntune('test/jmeint.data')
+    nntune_cw(sys.argv[1])
