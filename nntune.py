@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import os
 import random
+import logging
 
 
 TRAIN_CMD = './train'
@@ -97,7 +98,7 @@ def evaluate(datafn, hidden_topology):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
-    topology = [ninputs] + hidden_topology + [noutputs]
+    topology = [ninputs] + list(hidden_topology) + [noutputs]
 
     # Split into training and testing files.
     trainfn, testfn = divide_data(pairs)
@@ -143,21 +144,23 @@ def nntune(datafn):
     for topo in exhaustive_topos():
         errors = []
         for i in range(REPS):
-            print('testing {}, rep {}'.format('-'.join(map(str, topo)), i + 1))
-            error = evaluate(datafn, [64, 2])
-            print('RMSE:', error)
+            logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
+                                                     i + 1))
+            error = evaluate(datafn, topo)
+            logging.debug('RMSE: {}'.format(error))
             errors.append(error)
         average_error = sum(errors) / REPS
-        print('overall RMSE:', average_error)
+        logging.info('average RMSE: {}'.format(average_error))
 
         if min_error is None or average_error < min_error:
-            print('new best')
+            logging.debug('new best')
             min_error = average_error
             min_topo = topo
 
-    print('best topo:', '-'.join(map(str, min_topo)))
-    print('error:', min_error)
+    logging.info('best topo: {}'.format('-'.join(map(str, min_topo))))
+    logging.info('error: {}'.format(min_error))
 
 
 if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
     nntune('test/jmeint.data')
