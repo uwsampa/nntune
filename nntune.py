@@ -4,6 +4,7 @@ import os
 
 
 TRAIN_CMD = './train'
+RECALL_CMD = './recall'
 
 
 def shell(command, cwd=None, shell=False):
@@ -40,12 +41,17 @@ def get_shape(data_fn):
     return int(parts[1]), int(parts[2])
 
 
-def nntune(fn):
-    ninputs, noutputs = get_shape(fn)
-    nnfn = train(fn, [ninputs, 64, 2, noutputs])
+def recall(nnfn, datafn):
+    rmse = shell([RECALL_CMD, nnfn, datafn])
+    return float(rmse)
+
+
+def nntune(datafn):
+    ninputs, noutputs = get_shape(datafn)
+    nnfn = train(datafn, [ninputs, 64, 2, noutputs])
     try:
-        with open(nnfn) as f:
-            print(f.read())
+        rmse = recall(nnfn, datafn)
+        print(rmse)
     finally:
         os.remove(nnfn)
 
