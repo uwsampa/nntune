@@ -1,7 +1,7 @@
 .PHONY: all
 all: recall
 
-FANDIR=FANN-2.2.0-Source
+FANNDIR=FANN-2.2.0-Source
 
 CFLAGS += -I$(FANNDIR)/src/include
 LDFLAGS += -L$(FANNDIR)/src -lfann
@@ -11,6 +11,11 @@ train: train.o
 
 jmeint.nn: train test/jmeint.data
 	./$^
+
+.PHONY: fann
+fann:
+	cd $(FANNDIR) ; cmake .
+	cd $(FANNDIR) ; make
 
 .PHONY: clean
 clean:
