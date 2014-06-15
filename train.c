@@ -19,6 +19,7 @@ arguments (all required):
  - topology, as number of neurons per layer separated by dashes
  - epochs (integer)
  - learning rate (0.0-1.0 float)
+ - output filename
 */
 int main(int argc, char **argv)
 {
@@ -40,6 +41,9 @@ int main(int argc, char **argv)
 
     // Argument 4: learning rate.
     float learning_rate = atof(argv[4]);
+
+    // Argument 5: output filename.
+    const char *outfn = argv[5];
 
     struct fann *ann;
 	ann = fann_create_standard_array(num_layers, layer_sizes);
@@ -76,7 +80,7 @@ int main(int argc, char **argv)
 	
 	printf("RMSE = %f\n", sqrt(fann_get_MSE(ann)));
 
-	fann_save(ann, "trained.nn");
+	fann_save(ann, outfn);
 
 	fann_destroy_train(data);
 	fann_destroy(ann);
