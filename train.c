@@ -1,7 +1,9 @@
 #include "fann.h"
+#include <stdlib.h>
+#include <string.h>
 
-const char *USAGE = "foo \
-";
+const unsigned int MAX_LAYERS = 16;
+const float DESIRED_ERROR = 0.000001;
 
 int FANN_API test_callback(struct fann *ann, struct fann_train_data *train,
 	unsigned int max_epochs, unsigned int epochs_between_reports, 
@@ -11,21 +13,36 @@ int FANN_API test_callback(struct fann *ann, struct fann_train_data *train,
 	return 0;
 }
 
+/*
+arguments (all required):
+ - data filename
+ - topology, as number of neurons per layer separated by dashes
+ - epochs (integer)
+ - learning rate (0.0-1.0 float)
+*/
 int main(int argc, char **argv)
 {
-	fann_type *calc_out;
-	const unsigned int num_layers               = 4;
-	const unsigned int num_neurons_hidden[4]    = {18,64,2,2};
-	const float desired_error                   = (const float) 0.000001;
-    const unsigned int max_epochs               = 2000;
-	const unsigned int epochs_between_reports   = 10;
-	struct fann *ann;
-	struct fann_train_data *data;
+    // Argument 1: data filename.
+    const char *datafn = argv[1];
 
-	unsigned int i = 0;
-	unsigned int decimal_point;
+    // Argument 2: topology.
+    unsigned int layer_sizes[MAX_LAYERS];
+    unsigned int num_layers = 0;
+    char *token = strtok(argv[2], "-");
+    while (token != NULL) {
+        layer_sizes[num_layers] = atoi(token);
+        ++num_layers;
+        token = strtok(NULL, "-");
+    }
 
-	ann = fann_create_standard_array(num_layers, num_neurons_hidden);
+    // Argument 3: epoch count.
+    unsigned int max_epochs = atoi(argv[3]);
+
+    // Argument 4: learning rate.
+    float learning_rate = atof(argv[4]);
+
+    struct fann *ann;
+	ann = fann_create_standard_array(num_layers, layer_sizes);
 
 	fann_set_activation_steepness_hidden(ann, 0.5);
 	fann_set_activation_steepness_output(ann, 0.5);
@@ -36,14 +53,22 @@ int main(int argc, char **argv)
 	//fann_set_bit_fail_limit(ann, 0.01f);
 	fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
 
+    struct fann_train_data *data;
     data = fann_read_train_from_file(argv[1]);
 	fann_init_weights(ann, data);
 	
-	fann_train_on_data(ann, data, max_epochs, epochs_between_reports, desired_error);
+	fann_train_on_data(
+        ann,
+        data,
+        max_epochs,
+        10,  // epochs between reports
+        DESIRED_ERROR
+    );
 
 	printf("Testing network. %f\n", fann_test_data(ann, data));
 
-	for(i = 0; i < fann_length_train_data(data); i++)
+    fann_type *calc_out;
+	for(unsigned int i = 0; i < fann_length_train_data(data); ++i)
 	{
 		calc_out = fann_run(ann, data->input[i]);
 	}
