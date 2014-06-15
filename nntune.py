@@ -26,14 +26,29 @@ def train(datafile, topology, epochs=100, learning_rate=0.7):
     return fn
 
 
-def nntune():
-    fn = train('test/jmeint.data', [18, 64, 2, 2])
+def get_shape(data_fn):
+    """Get the number of inputs and number of outputs in the data file.
+    """
+    # Get at least the first three numbers in the file.
+    parts = []
+    with open(data_fn) as f:
+        for line in f:
+            parts += line.strip().split()
+            if len(parts) >= 3:
+                break
+
+    return int(parts[1]), int(parts[2])
+
+
+def nntune(fn):
+    ninputs, noutputs = get_shape(fn)
+    nnfn = train(fn, [ninputs, 64, 2, noutputs])
     try:
-        with open(fn) as f:
+        with open(nnfn) as f:
             print(f.read())
     finally:
-        os.remove(fn)
+        os.remove(nnfn)
 
 
 if __name__ == '__main__':
-    nntune()
+    nntune('test/jmeint.data')
