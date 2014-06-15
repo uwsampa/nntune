@@ -7,6 +7,7 @@ import random
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
+REPS = 5
 
 
 def shell(command, cwd=None, shell=False):
@@ -114,8 +115,48 @@ def evaluate(datafn, hidden_topology):
         os.remove(testfn)
 
 
+def increment_topo(topo, index, max_neurons):
+    topo[index] += 1
+    if topo[index] > max_neurons:
+        if index == 0:
+            return True
+        else:
+            topo[index] = 1
+            return increment_topo(topo, index - 1, max_neurons)
+    else:
+        return False
+
+
+def exhaustive_topos(max_layers=2, max_neurons=4):
+    for layers in range(1, max_layers + 1):
+        topo = [1] * layers
+        while True:
+            yield tuple(topo)
+            if increment_topo(topo, layers - 1, max_neurons):
+                break
+
+
 def nntune(datafn):
-    print(evaluate(datafn, [64, 2]))
+    min_error = None
+    min_topo = None
+
+    for topo in exhaustive_topos():
+        errors = []
+        for i in range(REPS):
+            print('testing {}, rep {}'.format('-'.join(map(str, topo)), i + 1))
+            error = evaluate(datafn, [64, 2])
+            print('RMSE:', error)
+            errors.append(error)
+        average_error = sum(errors) / REPS
+        print('overall RMSE:', average_error)
+
+        if min_error is None or average_error < min_error:
+            print('new best')
+            min_error = average_error
+            min_topo = topo
+
+    print('best topo:', '-'.join(map(str, min_topo)))
+    print('error:', min_error)
 
 
 if __name__ == '__main__':
