@@ -6,6 +6,7 @@ import random
 import logging
 import collections
 import sys
+import argparse
 
 
 TRAIN_CMD = './train'
@@ -204,7 +205,29 @@ def nntune_cw(datafn):
     print('best:', '-'.join(map(str, min_topo)))
     print('error:', min_error)
 
+def cli():
+    parser = argparse.ArgumentParser(
+        description='Exhaustive neural network training'
+    )
+    parser.add_argument(
+        '-train', dest='trainfn', action='store', type=str, required=True,
+        default=None, help='training data file'
+    )
+    parser.add_argument(
+        '-test', dest='testfn', action='store', type=str, required=False,
+        default=None, help='test data file (unsupported for now)'
+    )
+    parser.add_argument(
+        '-c', dest='use_cluster', action='store_true', default=False,
+        help='parallelize on cluster'
+    )
+    args = parser.parse_args()
+
+    if args.use_cluster:
+        nntune_cw(args.trainfn)
+    else:
+        nntune_sequential(args.trainfn)
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
-    nntune_cw(sys.argv[1])
+    cli()
