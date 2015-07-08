@@ -1,6 +1,8 @@
 #include "fann.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 const unsigned int MAX_LAYERS = 16;
 const float DESIRED_ERROR = 0.000001;
@@ -14,6 +16,14 @@ int FANN_API test_callback(struct fann *ann, struct fann_train_data *train,
 }
 
 /*
+Helper function to determine if a file exists
+*/
+int file_exists(const char* fname) {
+    return (access(fname, F_OK)!=-1);
+}
+
+
+/*
 arguments (all required):
  - training data filename
  - validation data filename
@@ -24,17 +34,28 @@ arguments (all required):
 */
 int main(int argc, char **argv)
 {
+    // Argument validation
+    if (argc != 7) {
+        printf("Error: Incorrect number of arguments!\n");
+        printf("  usage:   ./train <training dataset> <test dataset> <topology> <learning rate> <output file>\n");
+        printf("  example: ./train train.data test.data 18-4-2 100 0.02 output.nn\n");
+        return 0;
+    }
+
     // Argument 1: training data filename.
     const char *tr_datafn = argv[1];
+    assert(file_exists(tr_datafn));
 
     // Argument 2: validation data filename.
     const char *vl_datafn = argv[2];
+    assert(file_exists(vl_datafn));
 
     // Argument 2: topology.
     unsigned int layer_sizes[MAX_LAYERS];
     unsigned int num_layers = 0;
     char *token = strtok(argv[3], "-");
     while (token != NULL) {
+        assert(atoi(token)!=0);
         layer_sizes[num_layers] = atoi(token);
         ++num_layers;
         token = strtok(NULL, "-");
@@ -42,13 +63,14 @@ int main(int argc, char **argv)
 
     // Argument 3: epoch count.
     unsigned int max_epochs = atoi(argv[4]);
+    assert(max_epochs>50);
 
     // Argument 4: learning rate.
     float learning_rate = atof(argv[5]);
+    assert(learning_rate>0&&learning_rate<1);
 
     // Argument 5: output filename.
     const char *outfn = argv[6];
-
 
     // ANN
     struct fann *ann;
@@ -60,8 +82,6 @@ int main(int argc, char **argv)
     fann_set_activation_steepness_output(ann, 0.5);
     fann_set_activation_function_hidden(ann, FANN_SIGMOID);
     fann_set_activation_function_output(ann, FANN_SIGMOID);
-    //fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
-    //fann_set_bit_fail_limit(ann, 0.01f);
 
     // Set the learning rate
     fann_set_learning_rate(ann, learning_rate);
