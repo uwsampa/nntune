@@ -22,11 +22,9 @@ int file_exists(const char* fname) {
     return (access(fname, F_OK)!=-1);
 }
 
-
 /*
 arguments (all required):
  - training data filename
- - validation data filename
  - topology, as number of neurons per layer separated by dashes
  - epochs (integer)
  - learning rate (0.0-1.0 float)
@@ -35,25 +33,21 @@ arguments (all required):
 int main(int argc, char **argv)
 {
     // Argument validation
-    if (argc != 7) {
+    if (argc != 6) {
         printf("Error: Incorrect number of arguments!\n");
-        printf("  usage:   ./train <training dataset> <test dataset> <topology> <learning rate> <output file>\n");
-        printf("  example: ./train train.data test.data 18-4-2 100 0.02 output.nn\n");
+        printf("  usage:   ./train <training dataset> <topology> <learning rate> <nn file>\n");
+        printf("  example: ./train train.data 18-4-2 100 0.02 output.nn\n");
         return 0;
     }
 
     // Argument 1: training data filename.
-    const char *tr_datafn = argv[1];
-    assert(file_exists(tr_datafn));
-
-    // Argument 2: validation data filename.
-    const char *vl_datafn = argv[2];
-    assert(file_exists(vl_datafn));
+    const char *datafn = argv[1];
+    assert(file_exists(datafn));
 
     // Argument 2: topology.
     unsigned int layer_sizes[MAX_LAYERS];
     unsigned int num_layers = 0;
-    char *token = strtok(argv[3], "-");
+    char *token = strtok(argv[2], "-");
     while (token != NULL) {
         assert(atoi(token)!=0);
         layer_sizes[num_layers] = atoi(token);
@@ -62,15 +56,15 @@ int main(int argc, char **argv)
     }
 
     // Argument 3: epoch count.
-    unsigned int max_epochs = atoi(argv[4]);
+    unsigned int max_epochs = atoi(argv[3]);
     assert(max_epochs>50);
 
     // Argument 4: learning rate.
-    float learning_rate = atof(argv[5]);
+    float learning_rate = atof(argv[4]);
     assert(learning_rate>0&&learning_rate<1);
 
     // Argument 5: output filename.
-    const char *outfn = argv[6];
+    const char *outfn = argv[5];
 
     // ANN
     struct fann *ann;
@@ -87,34 +81,28 @@ int main(int argc, char **argv)
     fann_set_learning_rate(ann, learning_rate);
 
     // Training data
-    struct fann_train_data *tr_data;
-    tr_data = fann_read_train_from_file(tr_datafn);
+    struct fann_train_data *data;
+    data = fann_read_train_from_file(datafn);
 
     // Initialize training weights based on the training data
-    fann_init_weights(ann, tr_data);
+    fann_init_weights(ann, data);
 
     // Start the training!
     fann_train_on_data(
         ann,
-        tr_data,
+        data,
         max_epochs,
         10,  // epochs between reports
         DESIRED_ERROR
     );
 
     // Evaluating the training data
-    printf("Testing network on training data. MSE=%f\n", fann_test_data(ann, tr_data));
-
-    // Evaluating on validation data
-    struct fann_train_data *vl_data;
-    vl_data = fann_read_train_from_file(vl_datafn);
-    printf("Testing network on validation data. MSE=%f\n", fann_test_data(ann, vl_data));
+    printf("Testing network on training data. MSE=%f\n", fann_test_data(ann, data));
 
     // Dump the ANN specification
     fann_save(ann, outfn);
 
-    fann_destroy_train(tr_data);
-    fann_destroy_train(vl_data);
+    fann_destroy_train(data);
     fann_destroy(ann);
 
     return 0;
