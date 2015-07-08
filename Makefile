@@ -1,6 +1,6 @@
 FANNDIR=FANN-2.2.0-Source
 CFLAGS += -I$(FANNDIR)/src/include
-LDFLAGS += -L$(FANNDIR)/src -lfann
+LDFLAGS += -L$(FANNDIR)/src -lfann -lm
 
 ifeq ($(shell uname -s),Darwin)
 		LIBEXT := dylib
