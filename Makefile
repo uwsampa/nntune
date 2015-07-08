@@ -26,3 +26,4 @@ $(LIBFANN): $(FANNDIR)/src/*.c
 .PHONY: clean
 clean:
 	rm -f train train.o recall recall.o
+	cd $(FANNDIR) ; make clean
