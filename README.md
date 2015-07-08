@@ -4,3 +4,6 @@
     * `make fann` builds FANN with CMake
     * `make train` builds the `train` tool (which links against the FANN dynamic library)
     * `make recall` builds the `recall` tool for testing (also links to FANN, of course)
+
+2. To run neural network training locally enter the following command:
+    * `python nntune.py -train test/jmeint.data` will train multiple neural networks on your local machine and select the best one
