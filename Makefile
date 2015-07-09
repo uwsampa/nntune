@@ -11,7 +11,7 @@ endif
 LIBFANN=$(FANNDIR)/src/libfann.$(LIBEXT)
 
 .PHONY: all
-all: $(LIBFANN) train recall
+all: fann train recall
 
 train: train.o
 	$(CC) $(LDFLAGS) $^ -o $@
@@ -19,9 +19,9 @@ train: train.o
 recall: recall.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
-$(LIBFANN): $(FANNDIR)/src/*.c
+fann: $(FANNDIR)/src/*.c
 	cd $(FANNDIR) ; cmake .
-	cd $(FANNDIR) ; make
+	cd $(FANNDIR) ; sudo make install
 
 .PHONY: clean
 clean:
