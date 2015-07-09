@@ -1,0 +1,3 @@
+[submodule "cluster-workers"]
+	path = cluster-workers
+	url = git@github.com:sampsyo/cluster-workers.git
