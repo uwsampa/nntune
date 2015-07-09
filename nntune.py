@@ -8,6 +8,9 @@ import collections
 import sys
 import argparse
 
+# This needs to be modified to point to the fann shared resource dir
+# e.g. should be pointing to /usr/local/lib if installed locally
+FANN_LIB_DIR = '/sampa/share/FANN-2.2.0-Source/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
@@ -18,12 +21,18 @@ def shell(command, cwd=None, shell=False):
     """Execute a command (via a shell or directly). Capture the stdout
     and stderr streams as a string.
     """
-    return subprocess.check_output(
+    my_env = os.environ
+    my_env["LD_LIBRARY_PATH"] = FANN_LIB_DIR + ":" + my_env["LD_LIBRARY_PATH"]
+    # Setup environment correctly
+    outstr = subprocess.check_output(
         command,
         cwd=cwd,
         stderr=subprocess.STDOUT,
         shell=shell,
+        env=my_env
     )
+    logging.info( str(outstr) )
+    return outstr
 
 
 def train(datafile, topology, epochs=100, learning_rate=0.7):
@@ -164,7 +173,7 @@ def nntune_sequential(datafn):
     logging.info('error: {}'.format(min_error))
 
 
-def nntune_cw(datafn):
+def nntune_cw(datafn, clusterworkers):
     import cw.client
     import threading
 
@@ -181,8 +190,12 @@ def nntune_cw(datafn):
         logging.info(u'got result for {}'.format('-'.join(map(str, topo))))
         topo_errors[topo].append(output)
 
+    # Kill the master/workers in case previous run failed
+    cw.slurm.stop()
+
     # Run jobs.
-    client = cw.client.ClientThread(completion)
+    cw.slurm.start(nworkers=clusterworkers)
+    client = cw.client.ClientThread(completion, cw.slurm.master_host())
     client.start()
     for topo in exhaustive_topos():
         for i in range(REPS):
@@ -192,6 +205,7 @@ def nntune_cw(datafn):
             client.submit(jobid, evaluate, datafn, topo)
     logging.info('all jobs submitted')
     client.wait()
+    cw.slurm.stop()
     logging.info('all jobs finished')
 
     # Find best.
@@ -218,13 +232,13 @@ def cli():
         default=None, help='test data file (unsupported for now)'
     )
     parser.add_argument(
-        '-c', dest='use_cluster', action='store_true', default=False,
-        help='parallelize on cluster'
+        '-c', dest='clusterworkers', action='store', type=int, required=False,
+        default=0, help='parallelize on cluster'
     )
     args = parser.parse_args()
 
-    if args.use_cluster:
-        nntune_cw(args.trainfn)
+    if args.clusterworkers>0:
+        nntune_cw(args.trainfn, args.clusterworkers)
     else:
         nntune_sequential(args.trainfn)
 
