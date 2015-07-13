@@ -1,7 +1,7 @@
 # nntune
 
 0. Clone the repository to your Unix system. Use the submodules flag to grab the project's dependencies:
-    * `git clone --recurse-submodules git@github.com:sampsyo/cluster-workers.git`
+    * `git clone --recurse-submodules git@github.com:sampsyo/nntune.git`
     * Don't forget to switch to this branch: `git checkout -b thierry`
 
 1. If you're building this repo for the first time, install the dependencies by typing in `make install` (requires sudo access)
