@@ -18,6 +18,15 @@ TRAIN_CMD = './train'
 RECALL_CMD = './recall'
 REPS = 5
 
+LOG_FILE = 'inject_config.log'
+
+# Define Defaults Here
+DEFAULT_EPOCHS              = 1000
+DEFAULT_LEARNING_RATE       = 0.1
+DEFAULT_TEST_RATIO          = 0.7
+DEFAULT_TOPO_LOG_SEARCH     = True
+DEFAULT_TOPO_MAX_LAYERS     = 2
+DEFAULT_TOPO_MAX_NEURONS    = 8
 
 def shell(command, cwd=None, shell=False):
     """Execute a command (via a shell or directly). Capture the stdout
@@ -37,7 +46,7 @@ def shell(command, cwd=None, shell=False):
     return outstr
 
 
-def train(datafile, topology, epochs=100, learning_rate=0.7):
+def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARNING_RATE):
     topostr = '-'.join(str(n) for n in topology)
     fd, fn = tempfile.mkstemp()
     os.close(fd)
@@ -94,7 +103,7 @@ def dump_data_to_temp(data):
     return fn
 
 
-def divide_data(pairs, proportion=0.7):
+def divide_data(pairs, proportion=DEFAULT_TEST_RATIO):
     """Given a data set (sequence of pairs), divide it into two parts.
     Return two filenames.
     """
@@ -130,8 +139,11 @@ def evaluate(datafn, hidden_topology):
         os.remove(testfn)
 
 
-def increment_topo(topo, index, max_neurons):
-    topo[index] += 1
+def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_LOG_SEARCH, incr=1):
+    if (logSearch):
+        topo[index] *= 2
+    else:
+        topo[index] += incr
     if topo[index] > max_neurons:
         if index == 0:
             return True
@@ -142,7 +154,7 @@ def increment_topo(topo, index, max_neurons):
         return False
 
 
-def exhaustive_topos(max_layers=2, max_neurons=4):
+def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOPO_MAX_NEURONS):
     for layers in range(1, max_layers + 1):
         topo = [1] * layers
         while True:
@@ -189,7 +201,7 @@ def nntune_cw(datafn, clusterworkers):
     def completion(jobid, output):
         with jobs_lock:
             topo = jobs.pop(jobid)
-        logging.info(u'got result for {}'.format('-'.join(map(str, topo))))
+        logging.info(u'got result for {}: error = {}'.format('-'.join(map(str, topo)), output))
         topo_errors[topo].append(output)
 
     # Kill the master/workers in case previous run failed
@@ -237,7 +249,32 @@ def cli():
         '-c', dest='clusterworkers', action='store', type=int, required=False,
         default=0, help='parallelize on cluster'
     )
+    parser.add_argument(
+        '-d', dest='debug', action='store_true', required=False,
+        default=False, help='print out debug messages'
+    )
+    parser.add_argument(
+        '-log', dest='logpath', action='store', type=str, required=False,
+        default=LOG_FILE, help='path to log file'
+    )
     args = parser.parse_args()
+
+    # Take care of log formatting
+    logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s", datefmt='%m/%d/%Y %I:%M:%S %p')
+    rootLogger = logging.getLogger()
+
+    fileHandler = logging.FileHandler(args.logpath)
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+
+    if(args.debug):
+        rootLogger.setLevel(logging.DEBUG)
+    else:
+        rootLogger.setLevel(logging.INFO)
 
     if args.clusterworkers>0:
         nntune_cw(args.trainfn, args.clusterworkers)
@@ -245,5 +282,5 @@ def cli():
         nntune_sequential(args.trainfn)
 
 if __name__ == '__main__':
-    logging.getLogger().setLevel(logging.INFO)
+
     cli()
