@@ -21,12 +21,13 @@ REPS = 5
 LOG_FILE = 'inject_config.log'
 
 # Define Defaults Here
-DEFAULT_EPOCHS              = 1000
-DEFAULT_LEARNING_RATE       = 0.1
+DEFAULT_EPOCHS              = 5000
+DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.7
-DEFAULT_TOPO_LOG_SEARCH     = True
+DEFAULT_TOPO_LOG_SEARCH     = False
 DEFAULT_TOPO_MAX_LAYERS     = 2
-DEFAULT_TOPO_MAX_NEURONS    = 8
+DEFAULT_TOPO_MAX_NEURONS    = 60
+DEFAULT_ERROR               = 1 # 0 for MSE, 1 for classification
 
 def shell(command, cwd=None, shell=False):
     """Execute a command (via a shell or directly). Capture the stdout
@@ -54,8 +55,8 @@ def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARN
     return fn
 
 
-def recall(nnfn, datafn):
-    rmse = shell([RECALL_CMD, nnfn, datafn])
+def recall(nnfn, datafn, error_mode=DEFAULT_ERROR):
+    rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
     return float(rmse)
 
 
@@ -139,7 +140,7 @@ def evaluate(datafn, hidden_topology):
         os.remove(testfn)
 
 
-def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_LOG_SEARCH, incr=1):
+def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_LOG_SEARCH, incr=5):
     if (logSearch):
         topo[index] *= 2
     else:
