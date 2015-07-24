@@ -18,6 +18,7 @@ TRAIN_CMD = './train'
 RECALL_CMD = './recall'
 REPS = 5
 
+# Log file path
 LOG_FILE = 'inject_config.log'
 
 # Define Defaults Here
