@@ -24,9 +24,9 @@ LOG_FILE = 'inject_config.log'
 DEFAULT_EPOCHS              = 5000
 DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.7
-DEFAULT_TOPO_LOG_SEARCH     = False
+DEFAULT_TOPO_LOG_SEARCH     = True
 DEFAULT_TOPO_MAX_LAYERS     = 2
-DEFAULT_TOPO_MAX_NEURONS    = 60
+DEFAULT_TOPO_MAX_NEURONS    = 64
 DEFAULT_ERROR               = 1 # 0 for MSE, 1 for classification
 
 def shell(command, cwd=None, shell=False):
