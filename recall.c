@@ -32,19 +32,26 @@ int main(int argc, char **argv)
     {
         fann_type *calc_out = fann_run(ann, data->input[i]);
         for (j = 0; j < num_outputs; ++j) {
-            fann_type value = calc_out[j];
-            fann_type error = value - data->output[i][j];
-            se += error * error;
-            if((value>=0.5 && data->output[i][j]<0.5)||(value<0.5 && data->output[i][j]>=0.5)) {
+            fann_type pred = calc_out[j];
+            fann_type actual = data->output[i][j];
+            fann_type error = pred - actual;
+            se += (error * error);
+            if((pred>=0.5 && actual==0)||(pred<0.5 && actual==1)) {
                 ce ++;
             }
+            // printf("Iter %d\t pred:%f, actual:%f, ce: %f\n", i, pred, actual, ce);
         }
-    }
-    fann_type mse = se / (count * num_outputs);
+        // // Classification error specific to Jmeint
+        // if (((calc_out[1]>calc_out[0]) && (data->output[i][1]<data->output[i][0])) ||
+        //     ((calc_out[1]<calc_out[0]) && (data->output[i][1]>data->output[i][0]))) {
+        //     ce ++;
+        // }
+   }
+    fann_type mse = se / (count*num_outputs);
     fann_type rmse = sqrt(mse);
     fann_type class_error = (fann_type) ce/count;
     if (error_mode==0) {
-        printf("%f\n", rmse);
+        printf("%f\n", mse);
     } else {
         printf("%f\n", class_error);
     }
