@@ -22,9 +22,9 @@ REPS = 5
 LOG_FILE = 'inject_config.log'
 
 # Define Defaults Here
-DEFAULT_EPOCHS              = 5000
-DEFAULT_LEARNING_RATE       = 0.2
-DEFAULT_TEST_RATIO          = 0.7
+DEFAULT_EPOCHS              = 1000
+DEFAULT_LEARNING_RATE       = 0.25
+DEFAULT_TEST_RATIO          = 0.8
 DEFAULT_TOPO_LOG_SEARCH     = True
 DEFAULT_TOPO_MAX_LAYERS     = 2
 DEFAULT_TOPO_MAX_NEURONS    = 64
