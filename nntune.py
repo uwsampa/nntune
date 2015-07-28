@@ -24,7 +24,10 @@ def shell(command, cwd=None, shell=False):
     and stderr streams as a string.
     """
     my_env = os.environ
-    my_env["LD_LIBRARY_PATH"] = FANN_LIB_DIR + ":" + my_env["LD_LIBRARY_PATH"]
+    if (my_env.get("LD_LIBRARY_PATH")):
+        my_env["LD_LIBRARY_PATH"] = FANN_LIB_DIR + ":" + my_env["LD_LIBRARY_PATH"]
+    else:
+        my_env["LD_LIBRARY_PATH"] = FANN_LIB_DIR
     # Setup environment correctly
     outstr = subprocess.check_output(
         command,
