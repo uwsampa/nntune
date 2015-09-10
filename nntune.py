@@ -9,6 +9,8 @@ import logging
 import collections
 import sys
 import argparse
+import csv
+import datetime
 
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
@@ -16,19 +18,43 @@ FANN_LIB_DIR = '/sampa/share/FANN-2.2.0-Source/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
-REPS = 5
 
-# Log file path
-LOG_FILE = 'inject_config.log'
+# Output file paths
+LOG_FILE = 'nntune.log'
+CSV_FILE = 'output.csv'
 
 # Define Defaults Here
-DEFAULT_EPOCHS              = 1000
-DEFAULT_LEARNING_RATE       = 0.25
+# DEFAULT_EPOCHS              = 1000
+# DEFAULT_LEARNING_RATE       = 0.25
+# DEFAULT_TEST_RATIO          = 0.8
+# DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
+# DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to false, defines the step size
+# DEFAULT_TOPO_MAX_LAYERS     = 2
+# DEFAULT_TOPO_MAX_NEURONS    = 64
+# DEFAULT_ERROR_MODE          = 1 # 0 for MSE, 1 for classification
+DEFAULT_REPS                = 2     # Number of times we are training the same NN
+DEFAULT_EPOCHS              = 100
+DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.8
-DEFAULT_TOPO_LOG_SEARCH     = True
-DEFAULT_TOPO_MAX_LAYERS     = 2
-DEFAULT_TOPO_MAX_NEURONS    = 64
-DEFAULT_ERROR               = 1 # 0 for MSE, 1 for classification
+DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
+DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
+DEFAULT_TOPO_MAX_LAYERS     = 1
+DEFAULT_TOPO_MAX_NEURONS    = 4
+DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
+
+def get_params():
+    params = []
+    params.append(["timestamp", datetime.datetime.now()])
+    params.append(["reps", DEFAULT_REPS])
+    params.append(["epochs", DEFAULT_EPOCHS])
+    params.append(["learning rate", DEFAULT_LEARNING_RATE])
+    params.append(["test ratio", DEFAULT_TEST_RATIO])
+    params.append(["topo expoential", DEFAULT_TOPO_EXPONENTIAL])
+    params.append(["topo lin incr", DEFAULT_TOPO_LIN_INCR])
+    params.append(["topo max layers", DEFAULT_TOPO_MAX_LAYERS])
+    params.append(["topo max neurons", DEFAULT_TOPO_MAX_NEURONS])
+    params.append(["topo error mode", DEFAULT_ERROR_MODE])
+    return params
 
 def shell(command, cwd=None, shell=False):
     """Execute a command (via a shell or directly). Capture the stdout
@@ -60,7 +86,7 @@ def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARN
     return fn
 
 
-def recall(nnfn, datafn, error_mode=DEFAULT_ERROR):
+def recall(nnfn, datafn, error_mode=DEFAULT_ERROR_MODE):
     rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
     return float(rmse)
 
@@ -145,7 +171,7 @@ def evaluate(datafn, hidden_topology):
         os.remove(testfn)
 
 
-def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_LOG_SEARCH, incr=5):
+def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_EXPONENTIAL, incr=DEFAULT_TOPO_LIN_INCR):
     if (logSearch):
         topo[index] *= 2
     else:
@@ -169,20 +195,23 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn):
+def nntune_sequential(datafn, csvpath):
     min_error = None
     min_topo = None
+    experiments = [] # experiments results
 
     for topo in exhaustive_topos():
         errors = []
-        for i in range(REPS):
+        for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
             error = evaluate(datafn, topo)
-            logging.debug('RMSE: {}'.format(error))
+            logging.debug('error: {}'.format(error))
             errors.append(error)
-        average_error = sum(errors) / REPS
-        logging.info('average RMSE: {}'.format(average_error))
+        average_error = sum(errors) / DEFAULT_REPS
+        logging.info('average error: {}'.format(average_error))
+
+        experiments.append({"topo":topo, "error":average_error})
 
         if min_error is None or average_error < min_error:
             logging.debug('new best')
@@ -192,10 +221,28 @@ def nntune_sequential(datafn):
     logging.info('best topo: {}'.format('-'.join(map(str, min_topo))))
     logging.info('error: {}'.format(min_error))
 
+    # Prepare CSV data
+    csv_data = get_params()
+    for topo in experiments:
+        topo_str = '-'.join(map(str, topo["topo"]))
+        csv_data.append([topo_str, topo["error"]])
+    # Dump to CSV
+    with open(csvpath, 'wb') as f:
+        wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+        for line in csv_data:
+            wr.writerow(line)
 
-def nntune_cw(datafn, clusterworkers):
+
+def nntune_cw(datafn, clusterworkers, csvpath):
     import cw.client
     import threading
+
+    # Useful maps
+    topo_2_idx_map = {}
+    idx_2_topo_map = {}
+    for topo_idx, topo in enumerate(exhaustive_topos()):
+        topo_2_idx_map[topo]=topo_idx
+        idx_2_topo_map[topo_idx]=topo
 
     # Map job IDs to topologies.
     jobs = {}
@@ -218,7 +265,7 @@ def nntune_cw(datafn, clusterworkers):
     client = cw.client.ClientThread(completion, cw.slurm.master_host())
     client.start()
     for topo in exhaustive_topos():
-        for i in range(REPS):
+        for i in range(DEFAULT_REPS):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
@@ -239,6 +286,18 @@ def nntune_cw(datafn, clusterworkers):
     print('best:', '-'.join(map(str, min_topo)))
     print('error:', min_error)
 
+    # Prepare CSV data
+    csv_data = get_params()
+    for topo in exhaustive_topos():
+        topo_str = '-'.join(map(str, topo))
+        topo_err = sum(topo) / len(topo)
+        csv_data.append([topo_str, topo_err])
+    # Dump to CSV
+    with open(csvpath, 'wb') as f:
+        wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+        for line in csv_data:
+            wr.writerow(line)
+
 def cli():
     parser = argparse.ArgumentParser(
         description='Exhaustive neural network training'
@@ -258,6 +317,10 @@ def cli():
     parser.add_argument(
         '-d', dest='debug', action='store_true', required=False,
         default=False, help='print out debug messages'
+    )
+    parser.add_argument(
+        '-csv', dest='csvpath', action='store', type=str, required=False,
+        default=CSV_FILE, help='path to csv results file'
     )
     parser.add_argument(
         '-log', dest='logpath', action='store', type=str, required=False,
@@ -283,9 +346,9 @@ def cli():
         rootLogger.setLevel(logging.INFO)
 
     if args.clusterworkers>0:
-        nntune_cw(args.trainfn, args.clusterworkers)
+        nntune_cw(args.trainfn, args.clusterworkers, args.csvpath)
     else:
-        nntune_sequential(args.trainfn)
+        nntune_sequential(args.trainfn, args.csvpath)
 
 if __name__ == '__main__':
 
