@@ -36,7 +36,7 @@ int main(int argc, char **argv)
             fann_type actual = data->output[i][j];
             fann_type error = pred - actual;
             se += (error * error);
-            if((pred>=0.5 && actual==0)||(pred<0.5 && actual==1)) {
+            if((pred>=0.5 && actual<0.5)||(pred<0.5 && actual>=0.5)) {
                 ce ++;
             }
             // printf("Iter %d\t pred:%f, actual:%f, ce: %f\n", i, pred, actual, ce);

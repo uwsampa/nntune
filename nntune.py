@@ -24,22 +24,14 @@ LOG_FILE = 'nntune.log'
 CSV_FILE = 'output.csv'
 
 # Define Defaults Here
-# DEFAULT_EPOCHS              = 1000
-# DEFAULT_LEARNING_RATE       = 0.25
-# DEFAULT_TEST_RATIO          = 0.8
-# DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
-# DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to false, defines the step size
-# DEFAULT_TOPO_MAX_LAYERS     = 2
-# DEFAULT_TOPO_MAX_NEURONS    = 64
-# DEFAULT_ERROR_MODE          = 1 # 0 for MSE, 1 for classification
 DEFAULT_REPS                = 2     # Number of times we are training the same NN
-DEFAULT_EPOCHS              = 100
-DEFAULT_LEARNING_RATE       = 0.2
+DEFAULT_EPOCHS              = 1000
+DEFAULT_LEARNING_RATE       = 0.25
 DEFAULT_TEST_RATIO          = 0.8
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
-DEFAULT_TOPO_MAX_LAYERS     = 1
-DEFAULT_TOPO_MAX_NEURONS    = 4
+DEFAULT_TOPO_MAX_LAYERS     = 2
+DEFAULT_TOPO_MAX_NEURONS    = 64
 DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
 
 def get_params():
