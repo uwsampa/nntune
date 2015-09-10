@@ -24,10 +24,10 @@ LOG_FILE = 'nntune.log'
 CSV_FILE = 'output.csv'
 
 # Define Defaults Here
-DEFAULT_REPS                = 2     # Number of times we are training the same NN
+DEFAULT_REPS                = 4     # Number of times we are training the same NN
 DEFAULT_EPOCHS              = 1000
-DEFAULT_LEARNING_RATE       = 0.25
-DEFAULT_TEST_RATIO          = 0.8
+DEFAULT_LEARNING_RATE       = 0.2
+DEFAULT_TEST_RATIO          = 0.7
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
 DEFAULT_TOPO_MAX_LAYERS     = 2
