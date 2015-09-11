@@ -165,22 +165,22 @@ def evaluate(datafn, hidden_topology):
 
 def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_EXPONENTIAL, incr=DEFAULT_TOPO_LIN_INCR):
     if (logSearch):
-        topo[index] *= 2
+        topo[index] /= 2
     else:
-        topo[index] += incr
-    if topo[index] > max_neurons:
+        topo[index] -= incr
+    if topo[index] < 1:
         if index == 0:
             return True
         else:
-            topo[index] = 1
+            topo[index] = max_neurons
             return increment_topo(topo, index - 1, max_neurons)
     else:
         return False
 
 
 def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOPO_MAX_NEURONS):
-    for layers in range(1, max_layers + 1):
-        topo = [1] * layers
+    for layers in range(max_layers, 0, -1):
+        topo = [max_neurons] * layers
         while True:
             yield tuple(topo)
             if increment_topo(topo, layers - 1, max_neurons):
