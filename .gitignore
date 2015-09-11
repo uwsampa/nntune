@@ -1,6 +1,8 @@
 train
+recall
 *.o
 *.dylib
 *.so
 FANN-2.2.0-Source/*.cmake
 FANN-2.2.0-Source/fann.pc
+FANN-2.2.0-Source/src/*.so*

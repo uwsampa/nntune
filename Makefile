@@ -33,8 +33,11 @@ fann_install: $(FANNDIR)/src/*.c
 cluster-workers: $(CWDIR)/cw/*.py
 	cd $(CWDIR); sudo python setup.py install
 
+CLEANME := train train.o recall recall.o \
+	*.out *.log *.csv
+
 .PHONY: clean
 clean:
-	rm -f train train.o recall recall.o
+	rm -f $(CLEANME)
 	cd $(FANNDIR) ; make clean
 	cd $(CWDIR); python setup.py clean
