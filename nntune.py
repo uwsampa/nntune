@@ -213,11 +213,26 @@ def nntune_sequential(datafn, csvpath):
     logging.info('best topo: {}'.format('-'.join(map(str, min_topo))))
     logging.info('error: {}'.format(min_error))
 
+    # Read training data params
+    input_neurons = 0
+    output_neurons = 0
+    with open(datafn, 'r') as f:
+        params = f.readline().rstrip().split(" ")
+        input_neurons = params[1]
+        output_neurons = params[2]
     # Prepare CSV data
     csv_data = get_params()
-    for topo in experiments:
-        topo_str = '-'.join(map(str, topo["topo"]))
-        csv_data.append([topo_str, topo["error"]])
+    for t in experiments:
+        topo = t["topo"]
+        topo_str = '-'.join(map(str, topo))
+        madds = 0
+        for i, hidden_neurons in enumerate(topo):
+            if (i==0):
+                madds += int(input_neurons)*int(hidden_neurons)
+            else:
+                madds += int(topo[i-1])*int(topo[i])
+        madds += int(topo[len(topo)-1])*int(output_neurons)
+        csv_data.append([topo_str, madds, t["error"]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
@@ -278,12 +293,27 @@ def nntune_cw(datafn, clusterworkers, csvpath):
     print('best:', '-'.join(map(str, min_topo)))
     print('error:', min_error)
 
+
+    # Read training data params
+    input_neurons = 0
+    output_neurons = 0
+    with open(datafn, 'r') as f:
+        params = f.readline().rstrip().split(" ")
+        input_neurons = params[1]
+        output_neurons = params[2]
     # Prepare CSV data
     csv_data = get_params()
     for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
         error = sum(errors) / len(errors)
-        csv_data.append([topo_str, error])
+        madds = 0
+        for i, hidden_neurons in enumerate(topo):
+            if (i==0):
+                madds += int(input_neurons)*int(hidden_neurons)
+            else:
+                madds += int(topo[i-1])*int(topo[i])
+        madds += int(topo[len(topo)-1])*int(output_neurons)
+        csv_data.append([topo_str, madds, t["error"]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
@@ -340,7 +370,7 @@ def cli():
     if args.clusterworkers>0:
         nntune_cw(args.trainfn, args.clusterworkers, args.csvpath)
     else:
-        nntune_sequential(args.trainfn, args.csvpath)
+    nntune_sequential(args.trainfn, args.csvpath)
 
 if __name__ == '__main__':
 
