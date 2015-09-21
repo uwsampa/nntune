@@ -280,10 +280,10 @@ def nntune_cw(datafn, clusterworkers, csvpath):
 
     # Prepare CSV data
     csv_data = get_params()
-    for topo in exhaustive_topos():
+    for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
-        topo_err = sum(topo) / len(topo)
-        csv_data.append([topo_str, topo_err])
+        error = sum(errors) / len(errors)
+        csv_data.append([topo_str, error])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
