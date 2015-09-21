@@ -370,7 +370,7 @@ def cli():
     if args.clusterworkers>0:
         nntune_cw(args.trainfn, args.clusterworkers, args.csvpath)
     else:
-    nntune_sequential(args.trainfn, args.csvpath)
+        nntune_sequential(args.trainfn, args.csvpath)
 
 if __name__ == '__main__':
 
