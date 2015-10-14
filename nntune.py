@@ -11,10 +11,11 @@ import sys
 import argparse
 import csv
 import datetime
+import math
 
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
-FANN_LIB_DIR = '/sampa/share/FANN-2.2.0-Source/src'
+FANN_LIB_DIR = '../fann/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
@@ -30,9 +31,9 @@ DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.7
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
-DEFAULT_TOPO_MAX_LAYERS     = 2
-DEFAULT_TOPO_MAX_NEURONS    = 64
-DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
+DEFAULT_TOPO_MAX_LAYERS     = 1
+DEFAULT_TOPO_MAX_NEURONS    = 8
+DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
 
 def get_params():
     params = []
@@ -41,7 +42,7 @@ def get_params():
     params.append(["epochs", DEFAULT_EPOCHS])
     params.append(["learning rate", DEFAULT_LEARNING_RATE])
     params.append(["test ratio", DEFAULT_TEST_RATIO])
-    params.append(["topo expoential", DEFAULT_TOPO_EXPONENTIAL])
+    params.append(["topo exponential", DEFAULT_TOPO_EXPONENTIAL])
     params.append(["topo lin incr", DEFAULT_TOPO_LIN_INCR])
     params.append(["topo max layers", DEFAULT_TOPO_MAX_LAYERS])
     params.append(["topo max neurons", DEFAULT_TOPO_MAX_NEURONS])
@@ -155,7 +156,6 @@ def evaluate(datafn, hidden_topology):
         try:
             # Test.
             return recall(nnfn, testfn)
-
         finally:
             os.remove(nnfn)
     finally:
@@ -327,10 +327,6 @@ def cli():
     parser.add_argument(
         '-train', dest='trainfn', action='store', type=str, required=True,
         default=None, help='training data file'
-    )
-    parser.add_argument(
-        '-test', dest='testfn', action='store', type=str, required=False,
-        default=None, help='test data file (unsupported for now)'
     )
     parser.add_argument(
         '-c', dest='clusterworkers', action='store', type=int, required=False,

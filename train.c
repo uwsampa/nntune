@@ -5,15 +5,7 @@
 #include <assert.h>
 
 const unsigned int MAX_LAYERS = 16;
-const float DESIRED_ERROR = 0.000001;
-
-int FANN_API test_callback(struct fann *ann, struct fann_train_data *train,
-    unsigned int max_epochs, unsigned int epochs_between_reports, 
-    float desired_error, unsigned int epochs)
-{
-    printf("Epochs     %8d. MSE: %.5f. Desired-MSE: %.5f\n", epochs, fann_get_MSE(ann), desired_error);
-    return 0;
-}
+const float DESIRED_ERROR = 0.01;
 
 /*
 Helper function to determine if a file exists
@@ -35,8 +27,8 @@ int main(int argc, char **argv)
     // Argument validation
     if (argc != 6) {
         printf("Error: Incorrect number of arguments!\n");
-        printf("  usage:   ./train <training dataset> <topology> <learning rate> <nn file>\n");
-        printf("  example: ./train train.data 18-4-2 100 0.02 output.nn\n");
+        printf("  usage:   ./train <training dataset> <topology> <epochs> <learning rate> <nn file>\n");
+        printf("  example: ./train train.data 18-4-2 100 0.2 output.nn\n");
         return 0;
     }
 
@@ -72,12 +64,12 @@ int main(int argc, char **argv)
 
     // Misc parameters.
     fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
-    fann_set_activation_steepness_hidden(ann, 0.5);
-    fann_set_activation_steepness_output(ann, 0.5);
-    fann_set_activation_function_hidden(ann, FANN_SIGMOID);
-    fann_set_activation_function_output(ann, FANN_SIGMOID);
+    fann_set_activation_steepness_hidden(ann, 1);
+    fann_set_activation_steepness_output(ann, 1);
+    fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC);
+    fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC);
 
-    // Set the learning rate
+    // Set the learning rate (probably will get ignored)
     fann_set_learning_rate(ann, learning_rate);
 
     // Training data
@@ -92,7 +84,7 @@ int main(int argc, char **argv)
         ann,
         data,
         max_epochs,
-        10,  // epochs between reports
+        1000,  // epochs between reports
         DESIRED_ERROR
     );
 

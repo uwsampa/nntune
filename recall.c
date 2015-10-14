@@ -39,19 +39,13 @@ int main(int argc, char **argv)
             if((pred>=0.5 && actual<0.5)||(pred<0.5 && actual>=0.5)) {
                 ce ++;
             }
-            // printf("Iter %d\t pred:%f, actual:%f, ce: %f\n", i, pred, actual, ce);
         }
-        // // Classification error specific to Jmeint
-        // if (((calc_out[1]>calc_out[0]) && (data->output[i][1]<data->output[i][0])) ||
-        //     ((calc_out[1]<calc_out[0]) && (data->output[i][1]>data->output[i][0]))) {
-        //     ce ++;
-        // }
    }
     fann_type mse = se / (count*num_outputs);
     fann_type rmse = sqrt(mse);
     fann_type class_error = (fann_type) ce/count;
     if (error_mode==0) {
-        printf("%f\n", mse);
+        printf("%f\n", fann_test_data(ann, data));
     } else {
         printf("%f\n", class_error);
     }

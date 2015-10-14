@@ -1,4 +1,4 @@
-FANNDIR=FANN-2.2.0-Source
+FANNDIR=../fann
 CWDIR=cluster-workers
 CFLAGS += -I$(FANNDIR)/src/include
 LDFLAGS += -L$(FANNDIR)/src -lfann -lm
@@ -12,23 +12,15 @@ endif
 LIBFANN=$(FANNDIR)/src/libfann.$(LIBEXT)
 
 .PHONY: all
-all: fann train recall
+all: train recall
 
-install: fann_install cluster-workers
+install: cluster-workers
 
 train: train.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 recall: recall.o
 	$(CC) $(LDFLAGS) $^ -o $@
-
-fann: $(FANNDIR)/src/*.c
-	cd $(FANNDIR) ; cmake .
-	cd $(FANNDIR) ; make
-
-fann_install: $(FANNDIR)/src/*.c
-	cd $(FANNDIR) ; cmake .
-	cd $(FANNDIR) ; sudo make install
 
 cluster-workers: $(CWDIR)/cw/*.py
 	cd $(CWDIR); sudo python setup.py install
@@ -39,5 +31,3 @@ CLEANME := train train.o recall recall.o \
 .PHONY: clean
 clean:
 	rm -f $(CLEANME)
-	cd $(FANNDIR) ; make clean
-	cd $(CWDIR); python setup.py clean
