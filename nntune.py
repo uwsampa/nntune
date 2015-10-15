@@ -76,7 +76,7 @@ def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARN
     topostr = '-'.join(str(n) for n in topology)
     fd, fn = tempfile.mkstemp()
     os.close(fd)
-    shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), DEFAULT_PRECISION, fn])
+    shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(DEFAULT_PRECISION), fn])
     return fn
 
 
