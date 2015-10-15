@@ -15,7 +15,7 @@ import math
 
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
-FANN_LIB_DIR = '../fann/src'
+FANN_LIB_DIR = '../fann-snnap/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
