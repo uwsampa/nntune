@@ -40,7 +40,7 @@ int main(int argc, char **argv)
                 ce ++;
             }
         }
-   }
+    }
     fann_type mse = se / (count*num_outputs);
     fann_type rmse = sqrt(mse);
     fann_type class_error = (fann_type) ce/count;

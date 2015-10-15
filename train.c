@@ -24,11 +24,14 @@ arguments (all required):
 */
 int main(int argc, char **argv)
 {
+    // String buffer
+    char fn[256];
+
     // Argument validation
-    if (argc != 6) {
+    if (argc != 7) {
         printf("Error: Incorrect number of arguments!\n");
-        printf("  usage:   ./train <training dataset> <topology> <epochs> <learning rate> <nn file>\n");
-        printf("  example: ./train train.data 18-4-2 100 0.2 output.nn\n");
+        printf("  usage:   ./train <training dataset> <topology> <epochs> <learning rate> <fixed precision> <nn file>\n");
+        printf("  example: ./train train.data 18-4-2 100 0.2 8 output\n");
         return 0;
     }
 
@@ -55,12 +58,37 @@ int main(int argc, char **argv)
     float learning_rate = atof(argv[4]);
     assert(learning_rate>0&&learning_rate<1);
 
-    // Argument 5: output filename.
-    const char *outfn = argv[5];
+    // Argument 5: decimal precision
+    unsigned int precision = atoi(argv[5]);
+
+    // Argument 6: output filename.
+    const char *outfn = argv[6];
 
     // ANN
     struct fann *ann;
     ann = fann_create_standard_array(num_layers, layer_sizes);
+
+    // Training data
+    struct fann_train_data *data;
+    data = fann_read_train_from_file(datafn);
+    if (precision!=0) {
+        unsigned i, j;
+        unsigned count = fann_length_train_data(data);
+        unsigned num_outputs = fann_num_output_train_data(data);
+        unsigned num_inputs = fann_num_input_train_data(data);
+        int temp;
+        for(i = 0; i < count; ++i)
+        {
+            for (j = 0; j < num_inputs; ++j) {
+                temp = (int) ((data->input[i][j]*pow(2,precision))+0.5);
+                data->input[i][j] = ((float) temp) / pow(2,precision);
+            }
+            for (j = 0; j < num_outputs; ++j) {
+                temp = (int) ((data->output[i][j]*pow(2,precision))+0.5);
+                data->output[i][j] = ((float) temp) / pow(2,precision);
+            }
+        }
+    }
 
     // Misc parameters.
     fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
@@ -71,10 +99,6 @@ int main(int argc, char **argv)
 
     // Set the learning rate (probably will get ignored)
     fann_set_learning_rate(ann, learning_rate);
-
-    // Training data
-    struct fann_train_data *data;
-    data = fann_read_train_from_file(datafn);
 
     // Initialize training weights based on the training data
     fann_init_weights(ann, data);
@@ -94,8 +118,21 @@ int main(int argc, char **argv)
     // Dump the ANN specification
     fann_save(ann, outfn);
 
-    fann_destroy_train(data);
+#ifdef FIXEDFANN
+    // Dump the ANN specification (fixed)
+    strcpy(fn, outfn);
+    strcat(fn, "_fixed");
+    unsigned decimal = fann_save_to_fixed(ann, fn);
+    printf("Fixed point configuration has %d decimal points\n", decimal);
+
+    // Dump the fixed point data
+    strcpy(fn, datafn);
+    strcat(fn, "_fixed");
+    fann_save_train_to_fixed(data, fn, decimal);
+#endif //FIXEDFANN
+
     fann_destroy(ann);
+    fann_destroy_train(data);
 
     return 0;
 }

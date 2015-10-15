@@ -34,6 +34,7 @@ DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step
 DEFAULT_TOPO_MAX_LAYERS     = 1
 DEFAULT_TOPO_MAX_NEURONS    = 8
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
+DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
 def get_params():
     params = []
@@ -75,7 +76,7 @@ def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARN
     topostr = '-'.join(str(n) for n in topology)
     fd, fn = tempfile.mkstemp()
     os.close(fd)
-    shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), fn])
+    shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), DEFAULT_PRECISION, fn])
     return fn
 
 
