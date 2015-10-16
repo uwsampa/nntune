@@ -21,7 +21,6 @@ int main(int argc, char **argv)
     int error_mode = atoi(argv[3]);
 
     unsigned i, j;
-    unsigned errors;
     unsigned count = fann_length_train_data(data);
     unsigned num_outputs = fann_num_output_train_data(data);
     // Squared error

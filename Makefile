@@ -17,7 +17,7 @@ endif
 LIBFANN=$(FANNDIR)/src/libfann.$(LIBEXT)
 
 .PHONY: all
-all: train recall
+all: train recall recall_fix
 
 install: cluster-workers
 
@@ -27,11 +27,14 @@ train: train.o
 recall: recall.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(FLOATFLAGS) $^ -o $@
 
+recall_fix: recall.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $(FIXEDFLAGS) $^ -o $@
+
 cluster-workers: $(CWDIR)/cw/*.py
 	cd $(CWDIR); sudo python setup.py install
 
-CLEANME := train train.o recall recall.o \
-	*.out *.log *.csv *.data *.nn *.nn_fixed
+CLEANME := train train.o recall_fix recall recall.o \
+	*.out *.log *.csv *.data *.nn
 
 .PHONY: clean
 clean:

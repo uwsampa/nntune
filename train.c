@@ -13,6 +13,16 @@ Helper function to determine if a file exists
 int file_exists(const char* fname) {
     return (access(fname, F_OK)!=-1);
 }
+/*
+Helper function to remove file extension
+*/
+void trim_ext(const char* mystr, char* retstr) {
+    char *lastdot;
+    strcpy (retstr, mystr);
+    lastdot = strrchr (retstr, '.');
+    if (lastdot != NULL)
+        *lastdot = '\0';
+}
 
 /*
 arguments (all required):
@@ -26,6 +36,7 @@ int main(int argc, char **argv)
 {
     // String buffer
     char fn[256];
+    char intbuf[8];
 
     // Argument validation
     if (argc != 7) {
@@ -60,6 +71,7 @@ int main(int argc, char **argv)
 
     // Argument 5: decimal precision
     unsigned int precision = atoi(argv[5]);
+    sprintf(intbuf, "%d", precision);
 
     // Argument 6: output filename.
     const char *outfn = argv[6];
@@ -118,18 +130,35 @@ int main(int argc, char **argv)
     // Dump the ANN specification
     fann_save(ann, outfn);
 
-#ifdef FIXEDFANN
-    // Dump the ANN specification (fixed)
-    strcpy(fn, outfn);
-    strcat(fn, "_fixed");
-    unsigned decimal = fann_save_to_fixed(ann, fn);
-    printf("Fixed point configuration has %d decimal points\n", decimal);
+    if (precision) {
 
-    // Dump the fixed point data
-    strcpy(fn, datafn);
-    strcat(fn, "_fixed");
-    fann_save_train_to_fixed(data, fn, decimal);
-#endif //FIXEDFANN
+        // Determine the decimal precision requirements
+        trim_ext(outfn, fn);
+        strcat(fn, "_fix");
+        strcat(fn, ".nn");
+        unsigned decimal = fann_save_to_fixed(ann, fn);
+        printf("Fixed point configuration has %d decimal points\n", decimal);
+
+        int i;
+        for (i=precision; i<decimal; i++) {
+            sprintf(intbuf, "%d", i);
+
+            // Dump the ANN specification (fixed)
+            trim_ext(outfn, fn);
+            strcat(fn, "_fix_");
+            strcat(fn, intbuf);
+            strcat(fn, ".nn");
+            fann_save_to_fixed_reduced_precision(ann, fn, i);
+
+            // Dump the fixed point data
+            trim_ext(datafn, fn);
+            strcat(fn, "_fix_");
+            strcat(fn, intbuf);
+            strcat(fn, ".data");
+            fann_save_train_to_fixed(data, fn, precision);
+        }
+
+    }
 
     fann_destroy(ann);
     fann_destroy_train(data);

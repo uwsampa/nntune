@@ -12,6 +12,7 @@ import argparse
 import csv
 import datetime
 import math
+import shlex
 
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
@@ -321,6 +322,15 @@ def nntune_cw(datafn, clusterworkers, csvpath):
         for line in csv_data:
             wr.writerow(line)
 
+def exploreTopologies(trainfn, wlim, clusterworkers, csvpath):
+    # Recompile the executables
+    shell(shlex.split('make WEIGHTLIM='+str(wlim)), cwd='.')
+
+    if clusterworkers>0:
+        nntune_cw(trainfn, clusterworkers, csvpath)
+    else:
+        nntune_sequential(trainfn, csvpath)
+
 def cli():
     parser = argparse.ArgumentParser(
         description='Exhaustive neural network training'
@@ -328,6 +338,10 @@ def cli():
     parser.add_argument(
         '-train', dest='trainfn', action='store', type=str, required=True,
         default=None, help='training data file'
+    )
+    parser.add_argument(
+        '-wlim', dest='weigthlim', action='store', type=int, required=False,
+        default=8, help='weight magnitude limit'
     )
     parser.add_argument(
         '-c', dest='clusterworkers', action='store', type=int, required=False,
@@ -364,10 +378,7 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    if args.clusterworkers>0:
-        nntune_cw(args.trainfn, args.clusterworkers, args.csvpath)
-    else:
-        nntune_sequential(args.trainfn, args.csvpath)
+    exploreTopologies(args.trainfn, args.weigthlim, args.clusterworkers, args.csvpath)
 
 if __name__ == '__main__':
 
