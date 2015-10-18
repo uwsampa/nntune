@@ -13,13 +13,15 @@ import csv
 import datetime
 import math
 import shlex
+import shutil
 
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
 FANN_LIB_DIR = '../fann-snnap/src'
 
 TRAIN_CMD = './train'
-RECALL_CMD = './recall_fix'
+RECALL_CMD = './recall'
+RECALL_FIX_CMD = './recall_fix'
 
 # Output file paths
 LOG_FILE = 'nntune.log'
@@ -35,8 +37,8 @@ DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step
 DEFAULT_TOPO_MAX_LAYERS     = 1
 DEFAULT_TOPO_MAX_NEURONS    = 8
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
-DEFAULT_WLIM                = 8     # Largest value of a synaptic weigth
-DEFAULT_PRECISION           = 8     # 0 for float, anything else: fixed
+DEFAULT_WLIM                = 150   # Largest value of a synaptic weigth - 150 is FANN default
+DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
 def get_params():
     params = []
@@ -87,9 +89,12 @@ def train(datafile, topology, prec, testfile=None, epochs=DEFAULT_EPOCHS, learni
     return fn
 
 
-def recall(nnfn, datafn, error_mode=DEFAULT_ERROR_MODE):
+def recall(nnfn, datafn, prec, error_mode=DEFAULT_ERROR_MODE):
     logging.info("{}".format([RECALL_CMD, nnfn, datafn, str(error_mode)]))
-    rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
+    if prec==0:
+        rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
+    else:
+        rmse = shell([RECALL_FIX_CMD, nnfn, datafn, str(error_mode)])
     return float(rmse)
 
 
@@ -151,7 +156,7 @@ def divide_data(pairs, proportion=DEFAULT_TEST_RATIO):
     return fn1, fn2
 
 
-def evaluate(datafn, hidden_topology, prec):
+def evaluate(datafn, hidden_topology, prec, nndir, rep):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
@@ -164,8 +169,12 @@ def evaluate(datafn, hidden_topology, prec):
         nnfn = train(trainfn, topology, prec, testfn)
         try:
             # Test.
-            return recall(nnfn, testfn)
+            return recall(nnfn, testfn, prec)
         finally:
+            if (nndir):
+                topo_str = '-'.join(map(str, topology))
+                dest_fn = nndir+'/'+topo_str+'_rep'+str(rep)+'.nn'
+                shutil.copyfile(nnfn, dest_fn)
             os.remove(nnfn)
     finally:
         os.remove(trainfn)
@@ -196,7 +205,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, prec, csvpath):
+def nntune_sequential(datafn, prec, csvpath, nndir):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -206,7 +215,7 @@ def nntune_sequential(datafn, prec, csvpath):
         for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
-            error = evaluate(datafn, topo, prec)
+            error = evaluate(datafn, topo, prec, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
         average_error = sum(errors) / DEFAULT_REPS
@@ -249,7 +258,7 @@ def nntune_sequential(datafn, prec, csvpath):
             wr.writerow(line)
 
 
-def nntune_cw(datafn, prec, clusterworkers, csvpath):
+def nntune_cw(datafn, prec, clusterworkers, csvpath, nndir):
     import cw.client
     import threading
 
@@ -285,7 +294,7 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
-            client.submit(jobid, evaluate, datafn, topo, prec)
+            client.submit(jobid, evaluate, datafn, topo, prec, nndir, i)
     logging.info('all jobs submitted')
     client.wait()
     cw.slurm.stop()
@@ -301,7 +310,6 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath):
             min_topo = topo
     print('best:', '-'.join(map(str, min_topo)))
     print('error:', min_error)
-
 
     # Read training data params
     input_neurons = 0
@@ -329,14 +337,18 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath):
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, wlim, prec, clusterworkers, csvpath):
+def exploreTopologies(trainfn, wlim, prec, clusterworkers, csvpath, nndir):
     # Recompile the executables
     shell(shlex.split('make WEIGHTLIM='+str(wlim)), cwd='.')
 
+    if nndir:
+        if not os.path.exists(nndir):
+            os.makedirs(nndir)
+
     if clusterworkers>0:
-        nntune_cw(trainfn, prec, clusterworkers, csvpath)
+        nntune_cw(trainfn, prec, clusterworkers, csvpath, nndir)
     else:
-        nntune_sequential(trainfn, prec, csvpath)
+        nntune_sequential(trainfn, prec, csvpath, nndir)
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -370,6 +382,10 @@ def cli():
         '-log', dest='logpath', action='store', type=str, required=False,
         default=LOG_FILE, help='path to log file'
     )
+    parser.add_argument(
+        '-nndir', dest='nndir', action='store', type=str, required=False,
+        default=None, help='path to nn output dir'
+    )
     args = parser.parse_args()
 
     # Take care of log formatting
@@ -389,7 +405,7 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    exploreTopologies(args.trainfn, args.weigthlim, args.precision, args.clusterworkers, args.csvpath)
+    exploreTopologies(args.trainfn, args.weigthlim, args.precision, args.clusterworkers, args.csvpath, args.nndir)
 
 if __name__ == '__main__':
 
