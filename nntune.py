@@ -19,7 +19,7 @@ import shlex
 FANN_LIB_DIR = '../fann-snnap/src'
 
 TRAIN_CMD = './train'
-RECALL_CMD = './recall'
+RECALL_CMD = './recall_fix'
 
 # Output file paths
 LOG_FILE = 'nntune.log'
@@ -35,7 +35,8 @@ DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step
 DEFAULT_TOPO_MAX_LAYERS     = 1
 DEFAULT_TOPO_MAX_NEURONS    = 8
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
-DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
+DEFAULT_WLIM                = 8     # Largest value of a synaptic weigth
+DEFAULT_PRECISION           = 8     # 0 for float, anything else: fixed
 
 def get_params():
     params = []
@@ -73,15 +74,21 @@ def shell(command, cwd=None, shell=False):
     return outstr
 
 
-def train(datafile, topology, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARNING_RATE):
+def train(datafile, topology, prec, testfile=None, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARNING_RATE):
     topostr = '-'.join(str(n) for n in topology)
     fd, fn = tempfile.mkstemp()
     os.close(fd)
-    shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(DEFAULT_PRECISION), fn])
+    # Testfile is passed in for fixed point operation
+    logging.info("{}".format([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(prec), fn, testfile]))
+    if testfile:
+        shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(prec), fn, testfile])
+    else:
+        shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(prec), fn])
     return fn
 
 
 def recall(nnfn, datafn, error_mode=DEFAULT_ERROR_MODE):
+    logging.info("{}".format([RECALL_CMD, nnfn, datafn, str(error_mode)]))
     rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
     return float(rmse)
 
@@ -144,7 +151,7 @@ def divide_data(pairs, proportion=DEFAULT_TEST_RATIO):
     return fn1, fn2
 
 
-def evaluate(datafn, hidden_topology):
+def evaluate(datafn, hidden_topology, prec):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
@@ -154,7 +161,7 @@ def evaluate(datafn, hidden_topology):
     trainfn, testfn = divide_data(pairs)
     try:
         # Train.
-        nnfn = train(trainfn, topology)
+        nnfn = train(trainfn, topology, prec, testfn)
         try:
             # Test.
             return recall(nnfn, testfn)
@@ -189,7 +196,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, csvpath):
+def nntune_sequential(datafn, prec, csvpath):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -199,7 +206,7 @@ def nntune_sequential(datafn, csvpath):
         for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
-            error = evaluate(datafn, topo)
+            error = evaluate(datafn, topo, prec)
             logging.debug('error: {}'.format(error))
             errors.append(error)
         average_error = sum(errors) / DEFAULT_REPS
@@ -242,7 +249,7 @@ def nntune_sequential(datafn, csvpath):
             wr.writerow(line)
 
 
-def nntune_cw(datafn, clusterworkers, csvpath):
+def nntune_cw(datafn, prec, clusterworkers, csvpath):
     import cw.client
     import threading
 
@@ -278,7 +285,7 @@ def nntune_cw(datafn, clusterworkers, csvpath):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
-            client.submit(jobid, evaluate, datafn, topo)
+            client.submit(jobid, evaluate, datafn, topo, prec)
     logging.info('all jobs submitted')
     client.wait()
     cw.slurm.stop()
@@ -322,14 +329,14 @@ def nntune_cw(datafn, clusterworkers, csvpath):
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, wlim, clusterworkers, csvpath):
+def exploreTopologies(trainfn, wlim, prec, clusterworkers, csvpath):
     # Recompile the executables
     shell(shlex.split('make WEIGHTLIM='+str(wlim)), cwd='.')
 
     if clusterworkers>0:
-        nntune_cw(trainfn, clusterworkers, csvpath)
+        nntune_cw(trainfn, prec, clusterworkers, csvpath)
     else:
-        nntune_sequential(trainfn, csvpath)
+        nntune_sequential(trainfn, prec, csvpath)
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -341,7 +348,11 @@ def cli():
     )
     parser.add_argument(
         '-wlim', dest='weigthlim', action='store', type=int, required=False,
-        default=8, help='weight magnitude limit'
+        default=DEFAULT_WLIM, help='weight magnitude limit'
+    )
+    parser.add_argument(
+        '-prec', dest='precision', action='store', type=int, required=False,
+        default=DEFAULT_PRECISION, help='decimal precision of trained weights'
     )
     parser.add_argument(
         '-c', dest='clusterworkers', action='store', type=int, required=False,
@@ -378,7 +389,7 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    exploreTopologies(args.trainfn, args.weigthlim, args.clusterworkers, args.csvpath)
+    exploreTopologies(args.trainfn, args.weigthlim, args.precision, args.clusterworkers, args.csvpath)
 
 if __name__ == '__main__':
 

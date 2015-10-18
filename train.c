@@ -39,9 +39,9 @@ int main(int argc, char **argv)
     char intbuf[8];
 
     // Argument validation
-    if (argc != 7) {
+    if (argc != 7 && argc != 8) {
         printf("Error: Incorrect number of arguments!\n");
-        printf("  usage:   ./train <training dataset> <topology> <epochs> <learning rate> <fixed precision> <nn file>\n");
+        printf("  usage:   ./train <training dataset> <topology> <epochs> <learning rate> <fixed precision> <nn file> <optional: test dataset>\n");
         printf("  example: ./train train.data 18-4-2 100 0.2 8 output\n");
         return 0;
     }
@@ -75,6 +75,13 @@ int main(int argc, char **argv)
 
     // Argument 6: output filename.
     const char *outfn = argv[6];
+
+    // Argument 7: test data filename.
+    const char *testdatafn = "";
+    if (argc==8) {
+        testdatafn = argv[7];
+        assert(file_exists(testdatafn));
+    }
 
     // ANN
     struct fann *ann;
@@ -127,37 +134,47 @@ int main(int argc, char **argv)
     // Evaluating the training data
     printf("Testing network on training data. MSE=%f\n", fann_test_data(ann, data));
 
-    // Dump the ANN specification
-    fann_save(ann, outfn);
-
     if (precision) {
 
-        // Determine the decimal precision requirements
-        trim_ext(outfn, fn);
-        strcat(fn, "_fix");
-        strcat(fn, ".nn");
-        unsigned decimal = fann_save_to_fixed(ann, fn);
-        printf("Fixed point configuration has %d decimal points\n", decimal);
+        // // Determine the decimal precision requirements
+        // trim_ext(outfn, fn);
+        // strcat(fn, "_fix");
+        // strcat(fn, ".nn");
+        // unsigned decimal = fann_save_to_fixed(ann, fn);
+        // printf("Fixed point configuration has %d decimal points\n", decimal);
 
-        int i;
-        for (i=precision; i<decimal; i++) {
-            sprintf(intbuf, "%d", i);
+        // int i;
+        // for (i=precision; i<decimal; i++) {
+        //     sprintf(intbuf, "%d", i);
 
-            // Dump the ANN specification (fixed)
-            trim_ext(outfn, fn);
-            strcat(fn, "_fix_");
-            strcat(fn, intbuf);
-            strcat(fn, ".nn");
-            fann_save_to_fixed_reduced_precision(ann, fn, i);
+        //     // Dump the ANN specification (fixed)
+        //     trim_ext(outfn, fn);
+        //     strcat(fn, "_fix_");
+        //     strcat(fn, intbuf);
+        //     strcat(fn, ".nn");
+        //     fann_save_to_fixed_reduced_precision(ann, fn, i);
 
-            // Dump the fixed point data
-            trim_ext(datafn, fn);
-            strcat(fn, "_fix_");
-            strcat(fn, intbuf);
-            strcat(fn, ".data");
-            fann_save_train_to_fixed(data, fn, precision);
+        //     // Dump the fixed point data
+        //     trim_ext(datafn, fn);
+        //     strcat(fn, "_fix_");
+        //     strcat(fn, intbuf);
+        //     strcat(fn, ".data");
+        //     fann_save_train_to_fixed(data, fn, i);
+        // }
+
+        fann_save_to_fixed_reduced_precision(ann, outfn, precision);
+        fann_save_train_to_fixed(data, datafn, precision);
+
+        // Training data
+        if (strcmp (testdatafn,"") != 0) {
+            struct fann_train_data *test_data;
+            test_data = fann_read_train_from_file(testdatafn);
+            fann_save_train_to_fixed(test_data, testdatafn, precision);
         }
 
+    } else {
+        // Dump the ANN specification
+        fann_save(ann, outfn);
     }
 
     fann_destroy(ann);
