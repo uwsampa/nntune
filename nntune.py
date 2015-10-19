@@ -154,7 +154,7 @@ def divide_data(pairs, proportion=DEFAULT_TEST_RATIO):
     return fn1, fn2
 
 
-def evaluate(datafn, hidden_topology, prec, nndir, rep):
+def evaluate(datafn, hidden_topology, prec, errormode, nndir, rep):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
@@ -167,7 +167,7 @@ def evaluate(datafn, hidden_topology, prec, nndir, rep):
         nnfn = train(trainfn, topology, prec, testfn)
         try:
             # Test.
-            return recall(nnfn, testfn, prec)
+            return recall(nnfn, testfn, prec, errormode)
         finally:
             if (nndir):
                 topo_str = '-'.join(map(str, topology))
@@ -203,7 +203,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, prec, csvpath, nndir):
+def nntune_sequential(datafn, prec, errormode, csvpath, nndir):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -213,7 +213,7 @@ def nntune_sequential(datafn, prec, csvpath, nndir):
         for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
-            error = evaluate(datafn, topo, prec, nndir, i)
+            error = evaluate(datafn, topo, prec, errormode, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
         average_error = sum(errors) / DEFAULT_REPS
@@ -256,7 +256,7 @@ def nntune_sequential(datafn, prec, csvpath, nndir):
             wr.writerow(line)
 
 
-def nntune_cw(datafn, prec, clusterworkers, csvpath, nndir):
+def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
     import cw.client
     import threading
 
@@ -292,7 +292,7 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath, nndir):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
-            client.submit(jobid, evaluate, datafn, topo, prec, nndir, i)
+            client.submit(jobid, evaluate, datafn, topo, prec, errormode, nndir, i)
     logging.info('all jobs submitted')
     client.wait()
     cw.slurm.stop()
@@ -335,7 +335,7 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath, nndir):
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, intprec, decprec, clusterworkers, csvpath, nndir):
+def exploreTopologies(trainfn, intprec, decprec, errormode, clusterworkers, csvpath, nndir):
 
     # Exponentiate the wlim
     if (intprec!=DEFAULT_WLIM):
@@ -349,9 +349,9 @@ def exploreTopologies(trainfn, intprec, decprec, clusterworkers, csvpath, nndir)
             os.makedirs(nndir)
 
     if clusterworkers>0:
-        nntune_cw(trainfn, decprec, clusterworkers, csvpath, nndir)
+        nntune_cw(trainfn, decprec, errormode, clusterworkers, csvpath, nndir)
     else:
-        nntune_sequential(trainfn, decprec, csvpath, nndir)
+        nntune_sequential(trainfn, decprec, errormode, csvpath, nndir)
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -372,6 +372,10 @@ def cli():
     parser.add_argument(
         '-c', dest='clusterworkers', action='store', type=int, required=False,
         default=0, help='parallelize on cluster'
+    )
+    parser.add_argument(
+        '-error', dest='error_mode', action='store', type=int, required=False,
+        default=DEFAULT_ERROR_MODE, help='error mode: 0: MSE, 1: Classification'
     )
     parser.add_argument(
         '-d', dest='debug', action='store_true', required=False,
@@ -408,7 +412,7 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    exploreTopologies(args.trainfn, args.intbits, args.decbits, args.clusterworkers, args.csvpath, args.nndir)
+    exploreTopologies(args.trainfn, args.intbits, args.decbits, args.error_mode, args.clusterworkers, args.csvpath, args.nndir)
 
 if __name__ == '__main__':
 
