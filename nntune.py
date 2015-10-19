@@ -81,7 +81,6 @@ def train(datafile, topology, prec, testfile=None, epochs=DEFAULT_EPOCHS, learni
     fd, fn = tempfile.mkstemp()
     os.close(fd)
     # Testfile is passed in for fixed point operation
-    logging.info("{}".format([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(prec), fn, testfile]))
     if testfile:
         shell([TRAIN_CMD, datafile, topostr, str(epochs), str(learning_rate), str(prec), fn, testfile])
     else:
@@ -90,7 +89,6 @@ def train(datafile, topology, prec, testfile=None, epochs=DEFAULT_EPOCHS, learni
 
 
 def recall(nnfn, datafn, prec, error_mode=DEFAULT_ERROR_MODE):
-    logging.info("{}".format([RECALL_CMD, nnfn, datafn, str(error_mode)]))
     if prec==0:
         rmse = shell([RECALL_CMD, nnfn, datafn, str(error_mode)])
     else:
@@ -337,18 +335,23 @@ def nntune_cw(datafn, prec, clusterworkers, csvpath, nndir):
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, wlim, prec, clusterworkers, csvpath, nndir):
+def exploreTopologies(trainfn, intprec, decprec, clusterworkers, csvpath, nndir):
+
+    # Exponentiate the wlim
+    if (intprec!=DEFAULT_WLIM):
+        intprec = pow(2, intprec)
+
     # Recompile the executables
-    shell(shlex.split('make WEIGHTLIM='+str(wlim)), cwd='.')
+    shell(shlex.split('make WEIGHTLIM='+str(intprec)), cwd='.')
 
     if nndir:
         if not os.path.exists(nndir):
             os.makedirs(nndir)
 
     if clusterworkers>0:
-        nntune_cw(trainfn, prec, clusterworkers, csvpath, nndir)
+        nntune_cw(trainfn, decprec, clusterworkers, csvpath, nndir)
     else:
-        nntune_sequential(trainfn, prec, csvpath, nndir)
+        nntune_sequential(trainfn, decprec, csvpath, nndir)
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -359,11 +362,11 @@ def cli():
         default=None, help='training data file'
     )
     parser.add_argument(
-        '-wlim', dest='weigthlim', action='store', type=int, required=False,
-        default=DEFAULT_WLIM, help='weight magnitude limit'
+        '-intbits', dest='intbits', action='store', type=int, required=False,
+        default=DEFAULT_WLIM, help='integer precision of trained weights'
     )
     parser.add_argument(
-        '-prec', dest='precision', action='store', type=int, required=False,
+        '-decbits', dest='decbits', action='store', type=int, required=False,
         default=DEFAULT_PRECISION, help='decimal precision of trained weights'
     )
     parser.add_argument(
@@ -405,7 +408,7 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    exploreTopologies(args.trainfn, args.weigthlim, args.precision, args.clusterworkers, args.csvpath, args.nndir)
+    exploreTopologies(args.trainfn, args.intbits, args.decbits, args.clusterworkers, args.csvpath, args.nndir)
 
 if __name__ == '__main__':
 
