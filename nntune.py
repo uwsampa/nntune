@@ -313,7 +313,7 @@ def nntune_cw(datafn, clusterworkers, csvpath):
             else:
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
-        csv_data.append([topo_str, madds, t["error"]])
+        csv_data.append([topo_str, madds, error])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
