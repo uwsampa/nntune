@@ -29,23 +29,23 @@ LOG_FILE = 'nntune.log'
 CSV_FILE = 'output.csv'
 
 # Define Defaults Here
-DEFAULT_REPS                = 4     # Number of times we are training the same NN
+DEFAULT_REPS                = 1     # Number of times we are training the same NN
 DEFAULT_EPOCHS              = 200
 DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.7
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
 DEFAULT_TOPO_MAX_LAYERS     = 1
-DEFAULT_TOPO_MAX_NEURONS    = 128
+DEFAULT_TOPO_MAX_NEURONS    = 4
 DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
 DEFAULT_WLIM                = 150   # Largest value of a synaptic weigth - 150 is FANN default
 DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
-def get_params():
+def get_params(epochs):
     params = []
     params.append(["timestamp", datetime.datetime.now()])
     params.append(["reps", DEFAULT_REPS])
-    params.append(["epochs", DEFAULT_EPOCHS])
+    params.append(["epochs", epochs])
     params.append(["learning rate", DEFAULT_LEARNING_RATE])
     params.append(["test ratio", DEFAULT_TEST_RATIO])
     params.append(["topo exponential", DEFAULT_TOPO_EXPONENTIAL])
@@ -77,7 +77,7 @@ def shell(command, cwd=None, shell=False):
     return outstr
 
 
-def train(datafile, topology, prec, testfile=None, epochs=DEFAULT_EPOCHS, learning_rate=DEFAULT_LEARNING_RATE):
+def train(datafile, topology, prec, epochs=DEFAULT_EPOCHS, testfile=None, learning_rate=DEFAULT_LEARNING_RATE):
     topostr = '-'.join(str(n) for n in topology)
     fd, fn = tempfile.mkstemp()
     os.close(fd)
@@ -134,10 +134,13 @@ def dump_data(data, f):
 def dump_data_to_temp(data):
     """Dump the data to a temporary file. Return the filename.
     """
-    fd, fn = tempfile.mkstemp()
-    f = os.fdopen(fd, 'w')
-    dump_data(data, f)
-    f.close()
+    if (len(data)>0):
+        fd, fn = tempfile.mkstemp()
+        f = os.fdopen(fd, 'w')
+        dump_data(data, f)
+        f.close()
+    else:
+        fn = None
     return fn
 
 
@@ -170,7 +173,7 @@ def splitPosNeg(pairs):
 
     return fn1, fn2
 
-def evaluate(datafn, testfn, hidden_topology, prec, errormode, nndir, rep):
+def evaluate(datafn, testfn, hidden_topology, prec, errormode, epochs, nndir, rep):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
@@ -191,13 +194,14 @@ def evaluate(datafn, testfn, hidden_topology, prec, errormode, nndir, rep):
 
     try:
         # Train.
-        nnfn = train(trainfn, topology, prec, testfn)
+        nnfn = train(trainfn, topology, prec, epochs, testfn)
         try:
             # Test.
             misclassification = recall(nnfn, testfn, prec, errormode)
+            # If binary classification, separate out Pos and Neg
             if (errormode):
-                false_pos = recall(nnfn, negtestfn, prec, errormode)
-                false_neg = recall(nnfn, postestfn, prec, errormode)
+                false_pos = recall(nnfn, negtestfn, prec, errormode) if (negtestfn) else -1
+                false_neg = recall(nnfn, postestfn, prec, errormode) if (postestfn) else -1
                 return [misclassification, false_pos, false_neg]
             else:
                 return [misclassification]
@@ -236,7 +240,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, testfn, prec, errormode, csvpath, nndir):
+def nntune_sequential(datafn, testfn, prec, errormode, epochs, csvpath, nndir):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -246,7 +250,7 @@ def nntune_sequential(datafn, testfn, prec, errormode, csvpath, nndir):
         for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
-            error = evaluate(datafn, testfn, topo, prec, errormode, nndir, i)
+            error = evaluate(datafn, testfn, topo, prec, errormode, epochs, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
         average_error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
@@ -278,7 +282,7 @@ def nntune_sequential(datafn, testfn, prec, errormode, csvpath, nndir):
         input_neurons = params[1]
         output_neurons = params[2]
     # Prepare CSV data
-    csv_data = get_params()
+    csv_data = get_params(epochs)
     for t in experiments:
         topo = t["topo"]
         topo_str = '-'.join(map(str, topo))
@@ -300,7 +304,7 @@ def nntune_sequential(datafn, testfn, prec, errormode, csvpath, nndir):
             wr.writerow(line)
 
 
-def nntune_cw(datafn, testfn, prec, errormode, clusterworkers, csvpath, nndir):
+def nntune_cw(datafn, testfn, prec, errormode, epochs, clusterworkers, csvpath, nndir):
     import cw.client
     import threading
 
@@ -336,7 +340,7 @@ def nntune_cw(datafn, testfn, prec, errormode, clusterworkers, csvpath, nndir):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
-            client.submit(jobid, evaluate, datafn, testfn, topo, prec, errormode, nndir, i)
+            client.submit(jobid, evaluate, datafn, testfn, topo, prec, errormode, epochs, nndir, i)
     logging.info('all jobs submitted')
     client.wait()
     cw.slurm.stop()
@@ -361,7 +365,7 @@ def nntune_cw(datafn, testfn, prec, errormode, clusterworkers, csvpath, nndir):
         input_neurons = params[1]
         output_neurons = params[2]
     # Prepare CSV data
-    csv_data = get_params()
+    csv_data = get_params(epochs)
     for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
         error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
@@ -382,7 +386,7 @@ def nntune_cw(datafn, testfn, prec, errormode, clusterworkers, csvpath, nndir):
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, testfn, intprec, decprec, errormode, clusterworkers, csvpath, nndir):
+def exploreTopologies(trainfn, testfn, intprec, decprec, errormode, epochs, clusterworkers, csvpath, nndir):
 
     # Exponentiate the wlim
     if (intprec!=DEFAULT_WLIM):
@@ -396,9 +400,26 @@ def exploreTopologies(trainfn, testfn, intprec, decprec, errormode, clusterworke
             os.makedirs(nndir)
 
     if clusterworkers>0:
-        nntune_cw(trainfn, testfn, decprec, errormode, clusterworkers, csvpath, nndir)
+        nntune_cw(
+            datafn=trainfn,
+            testfn=testfn,
+            prec=decprec,
+            errormode=errormode,
+            epochs=epochs,
+            clusterworkers=clusterworkers,
+            csvpath=csvpath,
+            nndir=nndir
+        )
     else:
-        nntune_sequential(trainfn, testfn, decprec, errormode, csvpath, nndir)
+        nntune_sequential(
+            datafn=trainfn,
+            testfn=testfn,
+            prec=decprec,
+            errormode=errormode,
+            epochs=epochs,
+            csvpath=csvpath,
+            nndir=nndir
+        )
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -419,6 +440,10 @@ def cli():
     parser.add_argument(
         '-decbits', dest='decbits', action='store', type=int, required=False,
         default=DEFAULT_PRECISION, help='decimal precision of trained weights'
+    )
+    parser.add_argument(
+        '-epochs', dest='epochs', action='store', type=int, required=False,
+        default=DEFAULT_EPOCHS, help='Number of epochs required for training'
     )
     parser.add_argument(
         '-c', dest='clusterworkers', action='store', type=int, required=False,
@@ -469,6 +494,7 @@ def cli():
         intprec=args.intbits,
         decprec=args.decbits,
         errormode=args.error_mode,
+        epochs=args.epochs,
         clusterworkers=args.clusterworkers,
         csvpath=args.csvpath,
         nndir=args.nndir
