@@ -18,6 +18,7 @@ import shutil
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
 FANN_LIB_DIR = '../fann-snnap/src'
+# FANN_LIB_DIR = '/sampa/share/FANN-2.2.0-Source/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
@@ -29,14 +30,14 @@ CSV_FILE = 'output.csv'
 
 # Define Defaults Here
 DEFAULT_REPS                = 4     # Number of times we are training the same NN
-DEFAULT_EPOCHS              = 1000
+DEFAULT_EPOCHS              = 200
 DEFAULT_LEARNING_RATE       = 0.2
 DEFAULT_TEST_RATIO          = 0.7
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
 DEFAULT_TOPO_MAX_LAYERS     = 1
-DEFAULT_TOPO_MAX_NEURONS    = 64
-DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
+DEFAULT_TOPO_MAX_NEURONS    = 128
+DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
 DEFAULT_WLIM                = 150   # Largest value of a synaptic weigth - 150 is FANN default
 DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
@@ -153,21 +154,53 @@ def divide_data(pairs, proportion=DEFAULT_TEST_RATIO):
 
     return fn1, fn2
 
+def splitPosNeg(pairs):
+    """Given a data set (sequence of pairs), divide it into positive and negative datasets.
+    Return two filenames.
+    """
+    pos, neg = [], []
+    for pair in pairs:
+        if pair[1][0] >= 0.5:
+            pos.append(pair)
+        else:
+            neg.append(pair)
 
-def evaluate(datafn, hidden_topology, prec, errormode, nndir, rep):
+    fn1 = dump_data_to_temp(pos)
+    fn2 = dump_data_to_temp(neg)
+
+    return fn1, fn2
+
+def evaluate(datafn, testfn, hidden_topology, prec, errormode, nndir, rep):
     # Read data.
     pairs = read_data(datafn)
     ninputs, noutputs = len(pairs[0][0]), len(pairs[0][1])
     topology = [ninputs] + list(hidden_topology) + [noutputs]
 
     # Split into training and testing files.
-    trainfn, testfn = divide_data(pairs)
+    if (testfn):
+        trainfn = dump_data_to_temp(pairs)
+        testPairs = read_data(testfn)
+        testfn = dump_data_to_temp(testPairs)
+        if (errormode == 1): # binary classifier
+            postestfn, negtestfn = splitPosNeg(testPairs)
+    else:
+        trainfn, testfn = divide_data(pairs)
+        if (errormode == 1): # binary classifier
+            testPairs = read_data(testfn)
+            postestfn, negtestfn = splitPosNeg(testPairs)
+
     try:
         # Train.
         nnfn = train(trainfn, topology, prec, testfn)
         try:
             # Test.
-            return recall(nnfn, testfn, prec, errormode)
+            misclassification = recall(nnfn, testfn, prec, errormode)
+            if (errormode):
+                false_pos = recall(nnfn, negtestfn, prec, errormode)
+                false_neg = recall(nnfn, postestfn, prec, errormode)
+                return [misclassification, false_pos, false_neg]
+            else:
+                return [misclassification]
         finally:
             if (nndir):
                 topo_str = '-'.join(map(str, topology))
@@ -203,7 +236,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, prec, errormode, csvpath, nndir):
+def nntune_sequential(datafn, testfn, prec, errormode, csvpath, nndir):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -213,17 +246,25 @@ def nntune_sequential(datafn, prec, errormode, csvpath, nndir):
         for i in range(DEFAULT_REPS):
             logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
                                                      i + 1))
-            error = evaluate(datafn, topo, prec, errormode, nndir, i)
+            error = evaluate(datafn, testfn, topo, prec, errormode, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
-        average_error = sum(errors) / DEFAULT_REPS
-        logging.info('average error: {}'.format(average_error))
+        average_error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
+        logging.info('average errors: {}'.format(average_error))
 
-        experiments.append({"topo":topo, "error":average_error})
+        if errormode==0:
+            experiments.append({"topo":topo, "error":average_error})
+        else:
+            experiments.append({
+                "topo":topo,
+                "misclassification":average_error[0],
+                "false_pos":average_error[1],
+                "false_neg":average_error[2]
+            })
 
-        if min_error is None or average_error < min_error:
+        if min_error is None or average_error[0] < min_error:
             logging.debug('new best')
-            min_error = average_error
+            min_error = average_error[0]
             min_topo = topo
 
     logging.info('best topo: {}'.format('-'.join(map(str, min_topo))))
@@ -248,7 +289,10 @@ def nntune_sequential(datafn, prec, errormode, csvpath, nndir):
             else:
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
-        csv_data.append([topo_str, madds, t["error"]])
+        if errormode==0:
+            csv_data.append([topo_str, madds, t["error"]])
+        else:
+            csv_data.append([topo_str, madds, t["misclassification"], t["false_pos"], t["false_neg"]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
@@ -256,7 +300,7 @@ def nntune_sequential(datafn, prec, errormode, csvpath, nndir):
             wr.writerow(line)
 
 
-def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
+def nntune_cw(datafn, testfn, prec, errormode, clusterworkers, csvpath, nndir):
     import cw.client
     import threading
 
@@ -292,7 +336,7 @@ def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
             jobid = cw.randid()
             with jobs_lock:
                 jobs[jobid] = topo
-            client.submit(jobid, evaluate, datafn, topo, prec, errormode, nndir, i)
+            client.submit(jobid, evaluate, datafn, testfn, topo, prec, errormode, nndir, i)
     logging.info('all jobs submitted')
     client.wait()
     cw.slurm.stop()
@@ -302,9 +346,9 @@ def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
     min_error = None
     min_topo = None
     for topo, errors in topo_errors.items():
-        error = sum(errors) / len(errors)
-        if min_error is None or error < min_error:
-            min_error = error
+        error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
+        if min_error is None or error[0] < min_error:
+            min_error = error[0]
             min_topo = topo
     print('best:', '-'.join(map(str, min_topo)))
     print('error:', min_error)
@@ -320,7 +364,7 @@ def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
     csv_data = get_params()
     for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
-        error = sum(errors) / len(errors)
+        error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
         madds = 0
         for i, hidden_neurons in enumerate(topo):
             if (i==0):
@@ -328,14 +372,17 @@ def nntune_cw(datafn, prec, errormode, clusterworkers, csvpath, nndir):
             else:
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
-        csv_data.append([topo_str, madds, t["error"]])
+        if errormode==0:
+            csv_data.append([topo_str, madds, error[0]])
+        else:
+            csv_data.append([topo_str, madds, error[0], error[1], error[2]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, intprec, decprec, errormode, clusterworkers, csvpath, nndir):
+def exploreTopologies(trainfn, testfn, intprec, decprec, errormode, clusterworkers, csvpath, nndir):
 
     # Exponentiate the wlim
     if (intprec!=DEFAULT_WLIM):
@@ -349,9 +396,9 @@ def exploreTopologies(trainfn, intprec, decprec, errormode, clusterworkers, csvp
             os.makedirs(nndir)
 
     if clusterworkers>0:
-        nntune_cw(trainfn, decprec, errormode, clusterworkers, csvpath, nndir)
+        nntune_cw(trainfn, testfn, decprec, errormode, clusterworkers, csvpath, nndir)
     else:
-        nntune_sequential(trainfn, decprec, errormode, csvpath, nndir)
+        nntune_sequential(trainfn, testfn, decprec, errormode, csvpath, nndir)
 
 def cli():
     parser = argparse.ArgumentParser(
@@ -360,6 +407,10 @@ def cli():
     parser.add_argument(
         '-train', dest='trainfn', action='store', type=str, required=True,
         default=None, help='training data file'
+    )
+    parser.add_argument(
+        '-test', dest='testfn', action='store', type=str, required=False,
+        default=None, help='test data file (optional)'
     )
     parser.add_argument(
         '-intbits', dest='intbits', action='store', type=int, required=False,
@@ -412,7 +463,16 @@ def cli():
     else:
         rootLogger.setLevel(logging.INFO)
 
-    exploreTopologies(args.trainfn, args.intbits, args.decbits, args.error_mode, args.clusterworkers, args.csvpath, args.nndir)
+    exploreTopologies(
+        trainfn=args.trainfn,
+        testfn=args.testfn,
+        intprec=args.intbits,
+        decprec=args.decbits,
+        errormode=args.error_mode,
+        clusterworkers=args.clusterworkers,
+        csvpath=args.csvpath,
+        nndir=args.nndir
+    )
 
 if __name__ == '__main__':
 
