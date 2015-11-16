@@ -34,7 +34,7 @@ cluster-workers: $(CWDIR)/cw/*.py
 	cd $(CWDIR); sudo python setup.py install
 
 CLEANME := train train.o recall_fix recall recall.o \
-	*.out *.log *.csv *.data *.nn
+	*.out *.log *.csv *.data *.nn ann.pdf
 
 .PHONY: clean
 clean:
