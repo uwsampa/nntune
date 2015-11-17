@@ -38,7 +38,7 @@ DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step
 DEFAULT_TOPO_MAX_LAYERS     = 1
 DEFAULT_TOPO_MAX_NEURONS    = 64
 DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
-DEFAULT_WLIM                = 1     # Largest value of a synaptic weigth - 150 is FANN default
+DEFAULT_WLIM                = 150   # Largest value of a synaptic weigth - 150 is FANN default
 DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
 def get_params(epochs):
