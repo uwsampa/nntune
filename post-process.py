@@ -33,7 +33,7 @@ def process(csvpath):
             spamreader = csv.reader(csvfile, delimiter=',', quotechar='\"')
             for row in spamreader:
                 if len(row)==5:
-                    fStats["errorData"].append([int(row[0]), int(row[1]), float(row[2]), float(row[3]), float(row[4])-1])
+                    fStats["errorData"].append([int(row[0]), int(row[1]), float(row[2]), float(row[3]), 1-float(row[4])])
                 elif len(row)==3:
                     fStats["errorData"].append([int(row[0]), int(row[1])])
         stats.append(fStats)
