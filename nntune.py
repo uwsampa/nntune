@@ -18,7 +18,6 @@ import shutil
 # This needs to be modified to point to the fann shared resource dir
 # e.g. should be pointing to /usr/local/lib if installed locally
 FANN_LIB_DIR = '../fann-snnap/src'
-# FANN_LIB_DIR = '/sampa/share/FANN-2.2.0-Source/src'
 
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
@@ -206,9 +205,9 @@ def evaluate(datafn, datafn2, testfn, hidden_topology, prec, errormode, epochs, 
             if (errormode):
                 false_pos = recall(nnfn, negtestfn, prec, errormode) if (negtestfn) else -1
                 false_neg = recall(nnfn, postestfn, prec, errormode) if (postestfn) else -1
-                return [misclassification, false_pos, false_neg]
+                return [rep, misclassification, false_pos, false_neg]
             else:
-                return [misclassification]
+                return [rep, misclassification]
         finally:
             if (nndir):
                 topo_str = '-'.join(map(str, topology))
@@ -257,26 +256,16 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, epochs, csvpath,
             error = evaluate(datafn, datafn2, testfn, topo, prec, errormode, epochs, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
-        average_error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
-        logging.info('average errors: {}'.format(average_error))
-
-        if errormode==0:
-            experiments.append({"topo":topo, "error":average_error})
-        else:
-            experiments.append({
-                "topo":topo,
-                "misclassification":average_error[0],
-                "false_pos":average_error[1],
-                "false_neg":average_error[2]
-            })
-
-        if min_error is None or average_error[0] < min_error:
-            logging.debug('new best')
-            min_error = average_error[0]
-            min_topo = topo
-
-    logging.info('best topo: {}'.format('-'.join(map(str, min_topo))))
-    logging.info('error: {}'.format(min_error))
+            if errormode==0:
+                experiments.append({"topo":topo, "rep":error[0], "error":error[1]})
+            else:
+                experiments.append({
+                    "topo":topo,
+                    "rep":error[0],
+                    "misclassification":error[1],
+                    "false_pos":error[2],
+                    "false_neg":error[3]
+                })
 
     # Read training data params
     input_neurons = 0
@@ -290,6 +279,7 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, epochs, csvpath,
     for t in experiments:
         topo = t["topo"]
         topo_str = '-'.join(map(str, topo))
+        rep = t["rep"]
         madds = 0
         for i, hidden_neurons in enumerate(topo):
             if (i==0):
@@ -298,9 +288,9 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, epochs, csvpath,
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
         if errormode==0:
-            csv_data.append([topo_str, madds, t["error"]])
+            csv_data.append([topo_str, rep, madds, t["error"]])
         else:
-            csv_data.append([topo_str, madds, t["misclassification"], t["false_pos"], t["false_neg"]])
+            csv_data.append([topo_str, rep, madds, t["misclassification"], t["false_pos"], t["false_neg"]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f)
@@ -350,17 +340,6 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
     cw.slurm.stop()
     logging.info('all jobs finished')
 
-    # Find best.
-    min_error = None
-    min_topo = None
-    for topo, errors in topo_errors.items():
-        error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
-        if min_error is None or error[0] < min_error:
-            min_error = error[0]
-            min_topo = topo
-    print('best:', '-'.join(map(str, min_topo)))
-    print('error:', min_error)
-
     # Read training data params
     input_neurons = 0
     output_neurons = 0
@@ -372,7 +351,6 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
     csv_data = get_params(epochs)
     for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
-        error = [sum(x) / DEFAULT_REPS for x in zip(*errors)]
         madds = 0
         for i, hidden_neurons in enumerate(topo):
             if (i==0):
@@ -380,10 +358,11 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
             else:
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
-        if errormode==0:
-            csv_data.append([topo_str, madds, error[0]])
-        else:
-            csv_data.append([topo_str, madds, error[0], error[1], error[2]])
+        for e in errors:
+            if errormode==0:
+                csv_data.append([topo_str, madds, e[0], e[1]])
+            else:
+                csv_data.append([topo_str, madds, e[0], e[1], e[2], e[3]])
     # Dump to CSV
     with open(csvpath, 'wb') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)

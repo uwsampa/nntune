@@ -32,10 +32,10 @@ def process(csvpath):
         with open(fn, 'rb') as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',', quotechar='\"')
             for row in spamreader:
-                if len(row)==5:
-                    fStats["errorData"].append([int(row[0]), int(row[1]), float(row[2]), float(row[3]), 1-float(row[4])])
-                elif len(row)==3:
-                    fStats["errorData"].append([int(row[0]), int(row[1])])
+                if len(row)==6:
+                    fStats["errorData"].append([int(row[0]), int(row[1]), int(row[2]), float(row[3]), float(row[4]), 1-float(row[5])])
+                elif len(row)==4:
+                    fStats["errorData"].append([int(row[0]), int(row[1]), int(row[2]), float(row[3])])
         stats.append(fStats)
 
     # Seaborn settings
@@ -47,7 +47,7 @@ def process(csvpath):
     yLabels = ["classification", "false pos", "recall"]
 
     # Dump to CSV file
-    csvData = [["config", "features", "MADD"] + yLabels]
+    csvData = [["config", "features", "MADD", "rep"] + yLabels]
     for stat in stats:
         filename = str.split(stat["fn"], '/')
         config = filename[len(filename)-1]
@@ -57,18 +57,20 @@ def process(csvpath):
             f.write("\t".join([str(x) for x in line])+"\n")
 
     # Plot accuracies
-    numPlot = len(stats[0]["errorData"][0])-2
+    numPlot = len(stats[0]["errorData"])-4
     f, axarr = plt.subplots(numPlot, sharex=True)
 
     # Multiple subplots for all of the errors
     for subplot in range(numPlot):
 
+        print stat["errorData"]
+
         # Plot data
         plots=[None] * len(stats)
         legend=[None] * len(stats)
         for i, stat in enumerate(stats):
-            x = np.array([p[1]*MADD_COST for p in stat["errorData"]])
-            y = np.array([p[2+subplot] for p in stat["errorData"]])
+            x = np.array([p[2]*MADD_COST for p in stat["errorData"]])
+            y = np.array([p[3+subplot] for p in stat["errorData"]])
             plots[i]=axarr[subplot].scatter(x, y, c=palette[i%len(palette)])
             filename=str.split(stat["fn"], '/')
             legend[i]=filename[len(filename)-1]
@@ -84,7 +86,7 @@ def process(csvpath):
 
         # Axes
         x1,x2,y1,y2 = axarr[subplot].axis()
-        axarr[subplot].axis((1E-7,1E-5,0,1))
+        axarr[subplot].axis((1E-9,1E-5,0,1))
         axarr[subplot].set_xscale('log')
         if subplot==numPlot-1:
             axarr[subplot].set_xlabel("ANN invocation cost (J)")
@@ -98,12 +100,6 @@ def process(csvpath):
     # Plot
     f.savefig('ann.pdf', bbox_inches='tight')
 
-    # # Precision and recall
-    # plt.axis((0,1,0,1))
-    # x = np.array([i[3] for i in csvData[1:]])
-    # y = np.array([i[4] for i in csvData[1:]])
-    # plt.scatter(x, y)
-    # plt.show()
 
 def cli():
     parser = argparse.ArgumentParser(
