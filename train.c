@@ -5,7 +5,7 @@
 #include <assert.h>
 
 const unsigned int MAX_LAYERS = 16;
-const float DESIRED_ERROR = 0.01;
+const float DESIRED_ERROR = 0.0001;
 
 /*
 Helper function to determine if a file exists
