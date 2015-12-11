@@ -37,7 +37,7 @@ DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step
 DEFAULT_TOPO_MAX_LAYERS     = 1
 DEFAULT_TOPO_MAX_NEURONS    = 64
 DEFAULT_ERROR_MODE          = 1     # 0 for MSE, 1 for classification
-DEFAULT_WLIM                = 150   # Largest value of a synaptic weigth - 150 is FANN default
+DEFAULT_INTPREC             = 0     # Number of bits in integer portion
 DEFAULT_PRECISION           = 0     # 0 for float, anything else: fixed
 
 def get_params(epochs):
@@ -372,8 +372,7 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
 def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, epochs, clusterworkers, csvpath, nndir):
 
     # Exponentiate the wlim
-    if (intprec!=DEFAULT_WLIM):
-        intprec = pow(2, intprec)
+    intprec = pow(2, intprec)
 
     # Recompile the executables
     shell(shlex.split('make WEIGHTLIM='+str(intprec)), cwd='.')
@@ -425,7 +424,7 @@ def cli():
     )
     parser.add_argument(
         '-intbits', dest='intbits', action='store', type=int, required=False,
-        default=DEFAULT_WLIM, help='integer precision of trained weights'
+        default=DEFAULT_INTPREC, help='integer precision of trained weights'
     )
     parser.add_argument(
         '-decbits', dest='decbits', action='store', type=int, required=False,
