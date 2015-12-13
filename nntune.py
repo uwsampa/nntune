@@ -30,14 +30,14 @@ NN_FILE = 'output.nn'
 NN_DIR = 'ann'
 
 # Define Defaults Here
-DEFAULT_REPS                = 1     # Number of times we are training the same NN
+DEFAULT_REPS                = 2     # Number of times we are training the same NN
 DEFAULT_EPOCHS              = 500   # Number of epochs
 DEFAULT_LEARNING_RATE       = 0.2   # Default learning rate
 DEFAULT_TRAIN_RATIO         = 0.7   # Proportion of training data to test data
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_LIN_INCR       = 5     # If above is set to False, defines the step size
 DEFAULT_TOPO_MAX_LAYERS     = 1     # Maximum number of hidden layers
-DEFAULT_TOPO_MAX_NEURONS    = 64    # Maximum number of neurons
+DEFAULT_TOPO_MAX_NEURONS    = 8    # Maximum number of neurons
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
 DEFAULT_ERROR_TARGET        = 0.1   # Error target
 DEFAULT_INTPREC             = 0     # Number of bits in integer portion (limits magnitude of weight)
@@ -301,9 +301,9 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
                 madds += int(topo[i-1])*int(topo[i])
         madds += int(topo[len(topo)-1])*int(output_neurons)
         if errormode==0:
-            csv_data.append([topo_str, rep, madds, t["mse"]])
+            csv_data.append([topo_str, madds, rep, t["mse"]])
         else:
-            csv_data.append([topo_str, rep, madds, t["misclassification"], t["false_pos"], t["false_neg"]])
+            csv_data.append([topo_str, madds, rep, t["misclassification"], t["false_pos"], t["false_neg"]])
         # Add the madd/error pair for the ANN
         ann_fn = nndir+'/'+topo_str+'_rep'+str(rep)+'.nn'
         ann_list.append([madds, t["mse"], ann_fn])
@@ -313,7 +313,7 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
     for ann in sorted(ann_list):
         if ann[1] < errortarget:
             shutil.copyfile(ann[2], nnpath)
-            logging.info("{} meets error target of {}".format(ann[2], ann[1]))
+            logging.info("{} with {} error meets target of {}".format(ann[2],  ann[1], errortarget))
             break
 
     # Dump to CSV
@@ -386,9 +386,9 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, errortarget, epochs, clu
         madds += int(topo[len(topo)-1])*int(output_neurons)
         for e in errors:
             if errormode==0:
-                csv_data.append([topo_str, madds, e[0], e[1]])
+                csv_data.append([madds, topo_str, e[0], e[1]])
             else:
-                csv_data.append([topo_str, madds, e[0], e[1], e[2], e[3]])
+                csv_data.append([madds, topo_str, e[0], e[1], e[2], e[3]])
         # Add the madd/error pair for the ANN
         ann_fn = nndir+'/'+topo_str+'_rep'+str(e[0])+'.nn'
         ann_list.append([madds, e[1], ann_fn])
@@ -397,7 +397,7 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, errortarget, epochs, clu
     for ann in sorted(ann_list):
         if ann[1] < errortarget:
             shutil.copyfile(ann[2], nnpath)
-            logging.info("{} meets error target of {}".format(ann[2], ann[1]))
+            logging.info("{} with {} error meets target of {}".format(ann[2],  ann[1], errortarget))
             break
 
     # Dump to CSV

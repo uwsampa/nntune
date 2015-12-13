@@ -3,16 +3,18 @@ import os
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from statistics import median
 import seaborn as sns
 
 OUTPUT="out.csv"
 
-# MADD cost in Joules
-MADD_COST = 3.03E-10
-
-X_THRESHOLD=None
-
 def process(csvpath):
+
+    # Seaborn settings
+    sns.set_context("poster", font_scale=1.7)
+    sns.set_style("white")
+    sns.set_style("ticks")
+    palette = sns.color_palette()
 
     # Obtain all of the files with the .csv extension
     csvFiles = []
@@ -28,77 +30,76 @@ def process(csvpath):
     # Load in scatterplot data
     stats = []
     for fn in csvFiles:
-        fStats = {"fn": os.path.splitext(fn)[0], "errorData": []}
+        fStats = {"fn": os.path.splitext(fn)[0], "rawData": [], "plotData": {}}
         with open(fn, 'rb') as csvfile:
-            spamreader = csv.reader(csvfile, delimiter=',', quotechar='\"')
-            for row in spamreader:
-                if len(row)==6:
-                    fStats["errorData"].append([int(row[0]), int(row[1]), int(row[2]), float(row[3]), float(row[4]), 1-float(row[5])])
-                elif len(row)==4:
-                    fStats["errorData"].append([int(row[0]), int(row[1]), int(row[2]), float(row[3])])
+            csvreader = csv.reader(csvfile, delimiter=',', quotechar='\"')
+            for row in csvreader:
+                if len(row)==4:
+                    fStats["rawData"].append([int(row[0]), int(row[1]), int(row[2]), float(row[3])])
+
+        for e in fStats["rawData"]:
+            madd = e[1]
+            error = e[3]
+            if madd not in fStats["plotData"]:
+                fStats["plotData"][madd] = {"error": [error]}
+            else:
+                fStats["plotData"][madd]["error"].append(error)
         stats.append(fStats)
 
-    # Seaborn settings
-    sns.set_style("white")
-    sns.set_style("ticks")
-    palette = [ '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-
     # Y-labels
-    yLabels = ["classification", "false pos", "recall"]
-
+    yLabels = ["Error"]
     # Dump to CSV file
-    csvData = [["config", "features", "MADD", "rep"] + yLabels]
+    csvData = [["config", "MADD", "Energy"] + yLabels]
     for stat in stats:
         filename = str.split(stat["fn"], '/')
         config = filename[len(filename)-1]
-        csvData += [[config]+x for x in sorted(stat["errorData"])]
+        csvData += [[config]+x for x in sorted(stat["rawData"])]
     with open(OUTPUT, 'w') as f:
         for line in csvData:
             f.write("\t".join([str(x) for x in line])+"\n")
 
-    # Plot accuracies
-    numPlot = len(stats[0]["errorData"])-4
-    f, axarr = plt.subplots(numPlot, sharex=True)
 
-    # Multiple subplots for all of the errors
-    for subplot in range(numPlot):
+    # Plot data
+    plots=[None] * len(stats)
+    legend=[None] * len(stats)
+    for i, stat in enumerate(stats):
+        datapoints = []
+        for feat in stat["plotData"]:
+            err_list = stat["plotData"][feat]["error"]
+            xy_dat = [feat]
+            xy_dat.append(median(err_list))
+            xy_dat.append(min(err_list))
+            xy_dat.append(max(err_list))
+            xy_dat.append(np.std(np.array(err_list)).tolist())
+            datapoints.append(xy_dat)
 
-        print stat["errorData"]
+        datapoints = sorted(datapoints)
 
-        # Plot data
-        plots=[None] * len(stats)
-        legend=[None] * len(stats)
-        for i, stat in enumerate(stats):
-            x = np.array([p[2]*MADD_COST for p in stat["errorData"]])
-            y = np.array([p[3+subplot] for p in stat["errorData"]])
-            plots[i]=axarr[subplot].scatter(x, y, c=palette[i%len(palette)])
-            filename=str.split(stat["fn"], '/')
-            legend[i]=filename[len(filename)-1]
+        x = np.array([dat[0] for dat in datapoints])
+        y = np.array([dat[1] for dat in datapoints])
+        y_min = np.array([dat[2] for dat in datapoints])
+        y_max = np.array([dat[3] for dat in datapoints])
+        y_std = np.array([dat[4] for dat in datapoints])
+        y_min = y - y_min
+        y_max = y_max - y
+        plots[i]=plt.scatter(x, y, c=palette[i%len(palette)], s=100)
+        filename=str.split(stat["fn"], '/')
+        legend[i]=filename[len(filename)-1]+" window"
 
-        # Plot legend
-        axarr[subplot].legend(plots,
-               legend,
-               title="Window Size",
-               scatterpoints=1,
-               loc='upper left',
-               ncol=1,
-               fontsize=6)
-
-        # Axes
-        x1,x2,y1,y2 = axarr[subplot].axis()
-        axarr[subplot].axis((1E-9,1E-5,0,1))
-        axarr[subplot].set_xscale('log')
-        if subplot==numPlot-1:
-            axarr[subplot].set_xlabel("ANN invocation cost (J)")
-        axarr[subplot].set_ylabel(yLabels[subplot])
-        f.suptitle("Accuracy-Energy Trade-offs", fontsize=14, fontweight='bold')
-
-        # X Threshold line
-        if X_THRESHOLD:
-            axarr[subplot].axvline(X_THRESHOLD)
+    # Plot legend
+    plt.legend(plots,
+           legend,
+           scatterpoints=1,
+           loc='upper right',
+           ncol=1)
+    # Axes
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((x1,x2,y1,y2))
+    plt.xlabel("ANN invocation cost (MADD ops)")
+    plt.ylabel(yLabels[0])
 
     # Plot
-    f.savefig('ann.pdf', bbox_inches='tight')
+    plt.savefig('ann.pdf', bbox_inches='tight')
 
 
 def cli():
