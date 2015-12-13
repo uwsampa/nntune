@@ -26,6 +26,7 @@ RECALL_FIX_CMD = './recall_fix'
 # Output file paths
 LOG_FILE = 'nntune.log'
 CSV_FILE = 'output.csv'
+NN_FILE = 'output.nn'
 NN_DIR = 'ann'
 
 # Define Defaults Here
@@ -222,7 +223,7 @@ def evaluate(datafn, datafn2, testfn, hidden_topology, prec, errormode, epochs, 
                 return [rep, misclassification]
         finally:
             if (nndir):
-                topo_str = '-'.join(map(str, topology))
+                topo_str = '-'.join(map(str, hidden_topology))
                 dest_fn = nndir+'/'+topo_str+'_rep'+str(rep)+'.nn'
                 shutil.copyfile(nnfn, dest_fn)
             os.remove(nnfn)
@@ -255,7 +256,7 @@ def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOP
                 break
 
 
-def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epochs, csvpath, nndir, csv_data):
+def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epochs, csvpath, nnpath, nndir, csv_data):
     min_error = None
     min_topo = None
     experiments = [] # experiments results
@@ -263,8 +264,7 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
     for topo in exhaustive_topos():
         errors = []
         for i in range(DEFAULT_REPS):
-            logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)),
-                                                     i + 1))
+            logging.info('testing {}, rep {}'.format('-'.join(map(str, topo)), i + 1))
             error = evaluate(datafn, datafn2, testfn, topo, prec, errormode, epochs, nndir, i)
             logging.debug('error: {}'.format(error))
             errors.append(error)
@@ -288,6 +288,7 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
         output_neurons = params[2]
 
     # Prepare CSV data
+    ann_list = []
     for t in experiments:
         topo = t["topo"]
         topo_str = '-'.join(map(str, topo))
@@ -303,6 +304,17 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
             csv_data.append([topo_str, rep, madds, t["mse"]])
         else:
             csv_data.append([topo_str, rep, madds, t["misclassification"], t["false_pos"], t["false_neg"]])
+        # Add the madd/error pair for the ANN
+        ann_fn = nndir+'/'+topo_str+'_rep'+str(rep)+'.nn'
+        ann_list.append([madds, t["mse"], ann_fn])
+    logging.info('{}'.format(ann_list))
+
+    # Find optimal configuration
+    for ann in sorted(ann_list):
+        if ann[1] < errortarget:
+            shutil.copyfile(ann[2], nnpath)
+            logging.info("{} meets error target of {}".format(ann[2], ann[1]))
+            break
 
     # Dump to CSV
     with open(csvpath, 'wb') as f:
@@ -311,7 +323,7 @@ def nntune_sequential(datafn, datafn2, testfn, prec, errormode, errortarget, epo
             wr.writerow(line)
 
 
-def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, csvpath, nndir, csv_data):
+def nntune_cw(datafn, datafn2, testfn, prec, errormode, errortarget, epochs, clusterworkers, csvpath, nndir, nnpath, csv_data):
     import cw.client
     import threading
 
@@ -362,6 +374,7 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
         output_neurons = params[2]
 
     # Prepare CSV data
+    ann_list = []
     for topo, errors in topo_errors.items():
         topo_str = '-'.join(map(str, topo))
         madds = 0
@@ -376,6 +389,16 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
                 csv_data.append([topo_str, madds, e[0], e[1]])
             else:
                 csv_data.append([topo_str, madds, e[0], e[1], e[2], e[3]])
+        # Add the madd/error pair for the ANN
+        ann_fn = nndir+'/'+topo_str+'_rep'+str(e[0])+'.nn'
+        ann_list.append([madds, e[1], ann_fn])
+
+    # Find optimal configuration
+    for ann in sorted(ann_list):
+        if ann[1] < errortarget:
+            shutil.copyfile(ann[2], nnpath)
+            logging.info("{} meets error target of {}".format(ann[2], ann[1]))
+            break
 
     # Dump to CSV
     with open(csvpath, 'wb') as f:
@@ -383,7 +406,7 @@ def nntune_cw(datafn, datafn2, testfn, prec, errormode, epochs, clusterworkers, 
         for line in csv_data:
             wr.writerow(line)
 
-def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, errortarget, epochs, clusterworkers, csvpath, nndir, csv_data):
+def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, errortarget, epochs, clusterworkers, csvpath, nnpath, nndir, csv_data):
 
     # Exponentiate the wlim
     intprec = pow(2, intprec)
@@ -407,6 +430,7 @@ def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, er
             epochs=epochs,
             clusterworkers=clusterworkers,
             csvpath=csvpath,
+            nnpath=nnpath,
             nndir=nndir,
             csv_data=csv_data
         )
@@ -420,6 +444,7 @@ def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, er
             errortarget=errortarget,
             epochs=epochs,
             csvpath=csvpath,
+            nnpath=nnpath,
             nndir=nndir,
             csv_data=csv_data
         )
@@ -477,6 +502,10 @@ def cli():
         default=LOG_FILE, help='path to log file'
     )
     parser.add_argument(
+        '-nnpath', dest='nnpath', action='store', type=str, required=False,
+        default=NN_FILE, help='path to nn file'
+    )
+    parser.add_argument(
         '-nndir', dest='nndir', action='store', type=str, required=False,
         default=NN_DIR, help='path to nn output dir'
     )
@@ -513,6 +542,7 @@ def cli():
         epochs=args.epochs,
         clusterworkers=args.clusterworkers,
         csvpath=args.csvpath,
+        nnpath=args.nnpath,
         nndir=args.nndir,
         csv_data=csv_data
     )
