@@ -19,6 +19,9 @@ import shutil
 # e.g. should be pointing to /usr/local/lib if installed locally
 FANN_LIB_DIR = '../fann-snnap/src'
 
+# Path where nntune.py resides
+NNTUNEDIR = os.path.dirname(os.path.realpath(__file__))
+
 TRAIN_CMD = './train'
 RECALL_CMD = './recall'
 RECALL_FIX_CMD = './recall_fix'
@@ -67,7 +70,7 @@ def get_params(intbits, decbits, epochs, error_mode, error_target):
 
     return params
 
-def shell(command, cwd=None, shell=False):
+def shell(command, cwd=NNTUNEDIR, shell=False):
     """Execute a command (via a shell or directly). Capture the stdout
     and stderr streams as a string.
     """
@@ -412,7 +415,7 @@ def exploreTopologies(trainfn, trainfn2, testfn, intprec, decprec, errormode, er
     intprec = pow(2, intprec)
 
     # Recompile the executables
-    shell(shlex.split('make WEIGHTLIM='+str(intprec)), cwd='.')
+    shell(shlex.split('make WEIGHTLIM='+str(intprec)))
 
     # Create the neural network directory
     if nndir:
