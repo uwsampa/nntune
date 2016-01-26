@@ -12,13 +12,13 @@ LDFLAGS += -lm
 all: train recall
 
 train: train.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $(FLOATFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(FLOATFLAGS) $(LDFLAGS) $^ -o $@
 
 recall: recall.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $(FLOATFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(FLOATFLAGS) $(LDFLAGS) $^ -o $@
 
 recall_fix: recall.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $(FIXEDFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(FIXEDFLAGS) $(LDFLAGS) $^ -o $@
 
 
 # Build cluster-workers (slurm-only)
