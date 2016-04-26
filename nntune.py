@@ -62,17 +62,17 @@ LOG_FILE = 'nntune.log'
 NN_FILE = 'output.nn'
 
 # Define Defaults Here
-DEFAULT_REPS                = 2     # Number of times we are training the same NN
+DEFAULT_REPS                = 4     # Number of times we are training the same NN
 DEFAULT_EPOCHS              = 500   # Number of epochs
 DEFAULT_LEARNING_RATE       = 0.2   # Default learning rate
 DEFAULT_TRAIN_RATIO         = 0.7   # Proportion of training data to test data
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_INCR           = 2     # Topology exploration step size
 DEFAULT_TOPO_MAX_LAYERS     = 1     # Maximum number of hidden layers
-DEFAULT_TOPO_MAX_NEURONS    = 64    # Maximum number of neurons
+DEFAULT_TOPO_MAX_NEURONS    = 16    # Maximum number of neurons
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
 DEFAULT_ERROR_TARGET        = 0.01  # Error target
-DEFAULT_INTPREC             = 0     # Number of bits in integer portion (limits magnitude of weight)
+DEFAULT_INTPREC             = 7     # Number of bits in integer portion (limits magnitude of weight)
 DEFAULT_DECPREC             = 0     # 0 for float, anything else: fixed
 
 def get_params(intbits, decbits, epochs, error_mode, error_target):
@@ -146,7 +146,7 @@ def isInt(s):
     except ValueError:
         return False
 
-def read_data(fn):
+def read_data(fn, balance=True):
     """Read a data file as a list of (input, output) pairs.
     """
     # Files can come in different formats
@@ -198,6 +198,26 @@ def read_data(fn):
         outputs = values[pos:pos + outputdim]
         pos += outputdim
         pairs.append(([float(n) for n in inputs], [float(n) for n in outputs]))
+
+    # Balance the training set distribution
+    if balance:
+        pos_pairs = []
+        neg_pairs = []
+        merged_pairs = []
+        for p in pairs:
+            if p[1][0] > 0.5:
+                pos_pairs.append(p)
+            else:
+                neg_pairs.append(p)
+        random.shuffle(pos_pairs)
+        random.shuffle(neg_pairs)
+        for i in range(len(neg_pairs) if len(pos_pairs) > len(neg_pairs) else len(pos_pairs)):
+            merged_pairs.append(pos_pairs[i])
+            merged_pairs.append(neg_pairs[i])
+
+        logging.info("Reshuffling {} pos and {} neg pairs".format(len(pos_pairs), len(neg_pairs)))
+
+        return merged_pairs
 
     return pairs
 
