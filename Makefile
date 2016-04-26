@@ -1,8 +1,7 @@
 FANNDIR=../fann-snnap
 CC=gcc
 CWDIR=cluster-workers
-WEIGHTLIM=1
-CFLAGS += -O3 -I$(FANNDIR)/src/include -I$(FANNDIR)/src/ -DWEIGHT_LIM=$(WEIGHTLIM)
+CFLAGS += -O3 -I$(FANNDIR)/src/include -I$(FANNDIR)/src/
 FLOATFLAGS += $(FANNDIR)/src/floatfann.c
 FIXEDFLAGS += -DFIXEDFANN $(FANNDIR)/src/fixedfann.c
 LDFLAGS += -lm

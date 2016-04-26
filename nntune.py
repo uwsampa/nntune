@@ -69,6 +69,7 @@ DEFAULT_TRAIN_RATIO         = 0.7   # Proportion of training data to test data
 DEFAULT_TOPO_EXPONENTIAL    = True  # Set to true if number of neurons should increase exponentially
 DEFAULT_TOPO_INCR           = 2     # Topology exploration step size
 DEFAULT_TOPO_MAX_LAYERS     = 1     # Maximum number of hidden layers
+DEFAULT_TOPO_MIN_NEURONS    = 4     # Minimum number of neurons
 DEFAULT_TOPO_MAX_NEURONS    = 16    # Maximum number of neurons
 DEFAULT_ERROR_MODE          = 0     # 0 for MSE, 1 for classification
 DEFAULT_ERROR_TARGET        = 0.01  # Error target
@@ -307,7 +308,7 @@ def evaluate(datafn, hidden_topology, prec, errormode, epochs, nntarget, rep):
         os.remove(testfn)
 
 
-def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_EXPONENTIAL, incr=DEFAULT_TOPO_INCR):
+def increment_topo(topo, index, min_neurons, max_neurons, logSearch=DEFAULT_TOPO_EXPONENTIAL, incr=DEFAULT_TOPO_INCR):
     if (logSearch):
         topo[index] *= incr
     else:
@@ -316,17 +317,17 @@ def increment_topo(topo, index, max_neurons, logSearch=DEFAULT_TOPO_EXPONENTIAL,
         if index == 0:
             return True
         else:
-            topo[index] = 1
-            return increment_topo(topo, index - 1, max_neurons)
+            topo[index] = min_neurons
+            return increment_topo(topo, index - 1, min_neurons, max_neurons)
     else:
         return False
 
-def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, max_neurons=DEFAULT_TOPO_MAX_NEURONS):
+def exhaustive_topos(max_layers=DEFAULT_TOPO_MAX_LAYERS, min_neurons=DEFAULT_TOPO_MIN_NEURONS, max_neurons=DEFAULT_TOPO_MAX_NEURONS):
     for layers in range(1, max_layers + 1):
-        topo = [1] * layers
+        topo = [min_neurons] * layers
         while True:
             yield tuple(topo)
-            if increment_topo(topo, layers - 1, max_neurons):
+            if increment_topo(topo, layers - 1, min_neurons, max_neurons):
                 break
 
 def nntune_sequential(datafn, prec, errormode, errortarget, epochs, nnpath):
